@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+  <head>
+    <title>YouTube to Spotify</title>
+    <style>
+      body {
+        width: 300px;
+        padding: 15px;
+        font-family: Arial, sans-serif;
+      }
+      .container {
+        text-align: center;
+      }
+      .title {
+        color: #1db954;
+        margin-bottom: 15px;
+      }
+      .status {
+        margin: 10px 0;
+        padding: 10px;
+        border-radius: 5px;
+        background-color: #f5f5f5;
+      }
+      .button {
+        background-color: #1db954;
+        color: white;
+        border: none;
+        padding: 10px 20px;
+        border-radius: 20px;
+        cursor: pointer;
+        font-weight: bold;
+        margin-top: 10px;
+      }
+      .button:hover {
+        background-color: #1ed760;
+      }
+      .input-group {
+        margin: 15px 0;
+        display: none;
+      }
+      .input-group.show {
+        display: block;
+      }
+      .input-field {
+        width: 90%;
+        padding: 8px;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h2 class="title">YouTube to Spotify</h2>
+      <div class="status" id="status">
+        Click the green button on YouTube video pages to add songs to your
+        Spotify playlist.
+      </div>
+      <div class="input-group" id="client-id-group">
+        <input
+          type="text"
+          id="client-id-input"
+          class="input-field"
+          placeholder="Enter your Spotify Client ID"
+        />
+      </div>
+      <button class="button" id="auth-button">Connect Spotify</button>
+    </div>
+    <script src="popup.js"></script>
+  </body>
+</html>
