@@ -24,79 +24,174 @@ class SpotifyClient {
   }
 
   async getToken() {
-    if (this.token) {
-      const isValid = await this.validateToken(this.token);
-      if (isValid) return this.token;
-    }
-
-    const storage = await chrome.storage.local.get(['spotify_token', 'client_id']);
-
-    if (storage.spotify_token) {
-      const isValid = await this.validateToken(storage.spotify_token);
-      if (isValid) {
-        this.token = storage.spotify_token;
-        return this.token;
+    try {
+      if (this.token) {
+        const isValid = await this.validateToken(this.token);
+        if (isValid) return this.token;
       }
-    }
 
-    if (!storage.client_id) {
-      throw new Error('Client ID not found');
-    }
+      const storage = await chrome.storage.local.get(['spotify_token', 'client_id']);
+      console.log('Storage state:', { hasToken: !!storage.spotify_token, hasClientId: !!storage.client_id });
 
-    this.token = await this.getNewToken(storage.client_id);
-    return this.token;
+      if (storage.spotify_token) {
+        const isValid = await this.validateToken(storage.spotify_token);
+        if (isValid) {
+          this.token = storage.spotify_token;
+          return this.token;
+        }
+      }
+
+      if (!storage.client_id) {
+        throw new Error('Client ID not found. Please set your Spotify Client ID in the extension settings.');
+      }
+
+      console.log('Getting new token with client ID:', storage.client_id);
+      this.token = await this.getNewToken(storage.client_id);
+      return this.token;
+    } catch (error) {
+      console.error('Error in getToken:', error);
+      throw error;
+    }
   }
 
   async validateToken(token) {
     try {
+      console.log('Validating token...');
       const response = await fetch(`${SPOTIFY_API.BASE_URL}/me`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
-      if (!response.ok) return false;
+      if (!response.ok) {
+        console.log('Token validation failed:', response.status, response.statusText);
+        return false;
+      }
 
       // Validate playlist if exists
       const storedPlaylist = await chrome.storage.local.get('playlist_id');
       if (storedPlaylist.playlist_id) {
+        console.log('Validating playlist:', storedPlaylist.playlist_id);
         const playlistResponse = await fetch(
           `${SPOTIFY_API.BASE_URL}/playlists/${storedPlaylist.playlist_id}`,
           { headers: { 'Authorization': `Bearer ${token}` } }
         );
 
         if (!playlistResponse.ok) {
-          console.log('Playlist was deleted, clearing token to force re-auth');
+          console.log('Playlist validation failed, clearing token');
           await chrome.storage.local.remove(['spotify_token', 'playlist_id']);
           return false;
         }
       }
 
+      console.log('Token validation successful');
       return true;
     } catch (error) {
+      console.error('Error in validateToken:', error);
       await chrome.storage.local.remove(['spotify_token', 'playlist_id']);
       return false;
     }
   }
 
   async getNewToken(clientId) {
-    const REDIRECT_URI = chrome.identity.getRedirectURL();
-    const authUrl = `${SPOTIFY_API.AUTH_URL}?client_id=${clientId}&response_type=token&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SPOTIFY_API.SCOPES.join(' '))}`;
-
     try {
-      const redirectUrl = await chrome.identity.launchWebAuthFlow({
-        url: authUrl,
-        interactive: true
-      });
+      const REDIRECT_URI = chrome.identity.getRedirectURL();
+      console.log('Redirect URI:', REDIRECT_URI);
 
-      const hash = redirectUrl.split('#')[1];
-      const params = new URLSearchParams(hash);
-      const accessToken = params.get('access_token');
+      // Validate Client ID format
+      if (!clientId || !/^[0-9a-f]{32}$/i.test(clientId)) {
+        throw new Error('Invalid Client ID format. Please check your Client ID.');
+      }
 
-      if (accessToken) {
+      const scope = SPOTIFY_API.SCOPES.join(' ');
+      const authUrl = new URL(SPOTIFY_API.AUTH_URL);
+
+      // Build auth URL with state parameter for security
+      const state = Math.random().toString(36).substring(2, 15);
+      authUrl.searchParams.append('client_id', clientId);
+      authUrl.searchParams.append('response_type', 'token');
+      authUrl.searchParams.append('redirect_uri', REDIRECT_URI);
+      authUrl.searchParams.append('scope', scope);
+      authUrl.searchParams.append('show_dialog', 'true');
+      authUrl.searchParams.append('state', state);
+
+      console.log('Starting authentication with URL:', authUrl.toString());
+
+      try {
+        const redirectUrl = await chrome.identity.launchWebAuthFlow({
+          url: authUrl.toString(),
+          interactive: true
+        });
+
+        console.log('Received redirect URL:', redirectUrl);
+
+        if (!redirectUrl) {
+          throw new Error('Authentication window was closed or blocked. Please try again and allow the popup.');
+        }
+
+        const hash = redirectUrl.split('#')[1];
+        if (!hash) {
+          throw new Error('Spotify did not return any authentication data. Please check your Client ID and Redirect URI in Spotify Dashboard.');
+        }
+
+        const params = new URLSearchParams(hash);
+        const returnedState = params.get('state');
+        const error = params.get('error');
+        const accessToken = params.get('access_token');
+
+        // Verify state to prevent CSRF
+        if (returnedState !== state) {
+          throw new Error('Security validation failed. Please try again.');
+        }
+
+        if (error) {
+          if (error === 'access_denied') {
+            throw new Error('Access was denied. Please accept the permissions when prompted.');
+          }
+          if (error === 'invalid_client') {
+            throw new Error('Invalid Client ID. Please check your Client ID in Spotify Dashboard.');
+          }
+          throw new Error(`Spotify authentication error: ${error}`);
+        }
+
+        if (!accessToken) {
+          throw new Error('No access token received. Please check your Spotify Developer Dashboard settings:\n1. Verify your Client ID\n2. Add this Redirect URI: ' + REDIRECT_URI);
+        }
+
+        // Validate the token with Spotify API
+        const validateResponse = await fetch('https://api.spotify.com/v1/me', {
+          headers: { 'Authorization': `Bearer ${accessToken}` }
+        });
+
+        if (!validateResponse.ok) {
+          throw new Error('Received invalid access token. Please check your Spotify Developer Dashboard settings.');
+        }
+
+        console.log('Authentication successful');
         await chrome.storage.local.set({ spotify_token: accessToken });
         return accessToken;
+
+      } catch (flowError) {
+        console.error('WebAuthFlow error:', flowError);
+        if (flowError.message.includes('cannot establish connection')) {
+          throw new Error('Could not open authentication window. Please check your popup blocker settings.');
+        }
+        throw flowError;
       }
+
     } catch (error) {
-      throw new Error('Authentication failed: ' + error.message);
+      console.error('Authentication error:', error);
+      await chrome.storage.local.remove('spotify_token');
+
+      // Create a more user-friendly error message
+      let errorMessage = 'Authentication failed. ';
+      if (error.message.includes('Client ID')) {
+        errorMessage += 'Please check your Client ID in the Spotify Dashboard and ensure it is correct.';
+      } else if (error.message.includes('Redirect URI')) {
+        errorMessage += `Please add this Redirect URI to your Spotify Dashboard: ${REDIRECT_URI}`;
+      } else {
+        errorMessage += error.message;
+      }
+
+      throw new Error(errorMessage);
     }
   }
 

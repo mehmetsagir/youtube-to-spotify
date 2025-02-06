@@ -39,10 +39,11 @@ function getSongInfo() {
 
 // UI Components
 class Toast {
-  constructor() {
+  constructor(buttonElement) {
     this.element = null;
     this.spinner = null;
     this.message = null;
+    this.buttonElement = buttonElement;
   }
 
   create() {
@@ -54,8 +55,6 @@ class Toast {
     this.element.id = 'spotify-toast';
     this.element.style.cssText = `
       position: fixed;
-      bottom: 80px;
-      right: 20px;
       background-color: ${SPOTIFY_COLORS.DARK};
       color: white;
       padding: 15px 20px;
@@ -63,12 +62,15 @@ class Toast {
       z-index: 9999;
       font-family: Arial, sans-serif;
       min-width: 200px;
+      max-width: 300px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       display: flex;
       align-items: center;
       gap: 10px;
       opacity: 0;
       transition: opacity 0.3s ease;
+      word-wrap: break-word;
+      box-sizing: border-box;
     `;
 
     // Create spinner
@@ -80,6 +82,7 @@ class Toast {
       border-radius: 50%;
       border-top-color: transparent;
       animation: spin 1s linear infinite;
+      flex-shrink: 0;
     `;
 
     // Add spinner animation
@@ -100,12 +103,51 @@ class Toast {
     this.element.appendChild(this.message);
     document.body.appendChild(this.element);
 
+    // Position toast after it's added to get correct dimensions
+    this.positionToast();
+
     // Show toast with animation
     setTimeout(() => {
       this.element.style.opacity = '1';
     }, 100);
 
     return this;
+  }
+
+  positionToast() {
+    const buttonRect = this.buttonElement.getBoundingClientRect();
+    const toastRect = this.element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const margin = 10; // Margin between toast and button/screen edges
+
+    // Calculate initial position (prefer above the button)
+    let top = buttonRect.top - toastRect.height - margin;
+    let left = buttonRect.left;
+
+    // If toast would go off the top, position it below the button
+    if (top < margin) {
+      top = buttonRect.bottom + margin;
+    }
+
+    // If toast would go off the bottom, position it above the button
+    if (top + toastRect.height > viewportHeight - margin) {
+      top = buttonRect.top - toastRect.height - margin;
+    }
+
+    // If toast would go off the right, align it with the right edge of the screen
+    if (left + toastRect.width > viewportWidth - margin) {
+      left = viewportWidth - toastRect.width - margin;
+    }
+
+    // If toast would go off the left, align it with the left edge of the screen
+    if (left < margin) {
+      left = margin;
+    }
+
+    // Apply the calculated position
+    this.element.style.top = `${top}px`;
+    this.element.style.left = `${left}px`;
   }
 
   async show(text, { type = 'info', duration = TOAST_DISPLAY_DURATION } = {}) {
@@ -122,6 +164,9 @@ class Toast {
       default:
         this.element.style.backgroundColor = SPOTIFY_COLORS.DARK;
     }
+
+    // Reposition after content update
+    this.positionToast();
 
     if (duration) {
       await delay(duration);
@@ -145,10 +190,20 @@ class Toast {
 class SpotifyButton {
   constructor() {
     this.element = null;
-    this.toast = new Toast();
+    this.toast = null; // Initialize toast as null
+    this.fullscreenHandler = this.handleFullscreenChange.bind(this);
+    this.isDragging = false;
+    this.currentX = 0;
+    this.currentY = 0;
+    this.initialX = 0;
+    this.initialY = 0;
+    this.xOffset = 0;
+    this.yOffset = 0;
+    this.longPressTimer = null;
+    this.longPressDuration = 500; // 500ms for long press
   }
 
-  create() {
+  async create() {
     if (document.getElementById('add-to-spotify-btn')) return;
 
     const spotifyIcon = `
@@ -160,66 +215,234 @@ class SpotifyButton {
     this.element = document.createElement('button');
     this.element.id = 'add-to-spotify-btn';
     this.element.innerHTML = `${spotifyIcon}Add to Spotify`;
+
+    // Load saved position
+    const position = await this.loadPosition();
+
+    // Set initial position
+    if (position.x === 0 && position.y === 0) {
+      // If no saved position, place it at the bottom right
+      const rect = this.element.getBoundingClientRect();
+      this.xOffset = window.innerWidth - 200; // 200px from right
+      this.yOffset = window.innerHeight - 100; // 100px from bottom
+    } else {
+      this.xOffset = position.x;
+      this.yOffset = position.y;
+    }
+
     this.setupStyles();
     this.setupEventListeners();
-    document.documentElement.appendChild(this.element);
+    this.setupDragListeners();
+    document.body.appendChild(this.element);
+    this.setupFullscreenHandlers();
+
+    // Make sure the button is visible
+    this.element.style.display = 'flex';
+    this.element.style.visibility = 'visible';
+
+    // Apply position
+    this.setTranslate(this.xOffset, this.yOffset);
+
+    this.toast = new Toast(this.element); // Create toast with button reference
   }
 
   setupStyles() {
     this.element.style.cssText = `
       position: fixed;
-      bottom: 20px;
-      right: 20px;
       background-color: ${SPOTIFY_COLORS.PRIMARY};
       color: white;
       border: none;
       border-radius: 24px;
       padding: 12px 24px;
-      cursor: pointer;
+      cursor: grab;
       font-weight: 600;
       font-size: 14px;
-      z-index: 99999;
+      z-index: 9999999;
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
       display: flex;
       align-items: center;
       justify-content: center;
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-      transform: translateZ(0);
-      -webkit-transform: translateZ(0);
+      transition: background-color 0.3s ease, box-shadow 0.3s ease;
+      touch-action: none;
+      user-select: none;
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
       letter-spacing: 0.3px;
       text-shadow: 0 1px 2px rgba(0,0,0,0.1);
       min-width: 160px;
+      will-change: transform;
+      pointer-events: auto;
+      opacity: 1;
+      visibility: visible;
     `;
+  }
+
+  setupDragListeners() {
+    let isDraggable = false;
+    let hasMoved = false;
+    let pressTimer = null;
+
+    const handleDragStart = (e) => {
+      if (e.type === 'mousedown' && e.button !== 0) return; // Only left click
+      e.preventDefault();
+      e.stopPropagation();
+
+      hasMoved = false;
+      const startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
+      const startY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
+
+      pressTimer = setTimeout(() => {
+        isDraggable = true;
+        this.isDragging = true;
+        this.element.style.cursor = 'grabbing';
+        this.element.style.transition = 'none';
+
+        this.initialX = startX - this.xOffset;
+        this.initialY = startY - this.yOffset;
+      }, 500);
+    };
+
+    const handleDragMove = (e) => {
+      if (!isDraggable || !this.isDragging) return;
+      e.preventDefault();
+      e.stopPropagation();
+
+      hasMoved = true;
+      const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
+      const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
+
+      this.currentX = clientX - this.initialX;
+      this.currentY = clientY - this.initialY;
+
+      this.xOffset = this.currentX;
+      this.yOffset = this.currentY;
+
+      this.setTranslate(this.currentX, this.currentY);
+    };
+
+    const handleDragEnd = (e) => {
+      clearTimeout(pressTimer);
+
+      if (this.isDragging && hasMoved) {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Prevent the upcoming click event
+        const preventClick = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          e.stopImmediatePropagation();
+          this.element.removeEventListener('click', preventClick, true);
+        };
+        this.element.addEventListener('click', preventClick, true);
+      }
+
+      this.isDragging = false;
+      isDraggable = false;
+
+      this.element.style.cursor = 'grab';
+      this.element.style.transition = 'box-shadow 0.3s ease';
+
+      if (hasMoved) {
+        this.savePosition(this.xOffset, this.yOffset);
+      }
+    };
+
+    // Mouse events
+    this.element.addEventListener('mousedown', handleDragStart);
+    document.addEventListener('mousemove', handleDragMove);
+    document.addEventListener('mouseup', handleDragEnd);
+
+    // Touch events
+    this.element.addEventListener('touchstart', handleDragStart, { passive: false });
+    document.addEventListener('touchmove', handleDragMove, { passive: false });
+    document.addEventListener('touchend', handleDragEnd);
+    document.addEventListener('touchcancel', handleDragEnd);
+
+    // Prevent context menu
+    this.element.addEventListener('contextmenu', e => e.preventDefault());
+  }
+
+  setTranslate(xPos, yPos) {
+    const rect = this.element.getBoundingClientRect();
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+
+    // Ensure button stays within viewport bounds
+    if (xPos < 0) xPos = 0;
+    if (xPos > viewportWidth - rect.width) xPos = viewportWidth - rect.width;
+    if (yPos < 0) yPos = 0;
+    if (yPos > viewportHeight - rect.height) yPos = viewportHeight - rect.height;
+
+    // Apply transform
+    this.element.style.transform = `translate(${xPos}px, ${yPos}px)`;
+  }
+
+  async savePosition(x, y) {
+    try {
+      await chrome.storage.local.set({ 'spotify_button_position': { x, y } });
+    } catch (error) {
+      console.error('Failed to save button position:', error);
+    }
+  }
+
+  async loadPosition() {
+    try {
+      const result = await chrome.storage.local.get('spotify_button_position');
+      return result.spotify_button_position || { x: 0, y: 0 };
+    } catch (error) {
+      console.error('Failed to load button position:', error);
+      return { x: 0, y: 0 };
+    }
+  }
+
+  setupFullscreenHandlers() {
+    // Listen for fullscreen changes
+    document.addEventListener('fullscreenchange', this.fullscreenHandler);
+    document.addEventListener('webkitfullscreenchange', this.fullscreenHandler);
+    document.addEventListener('mozfullscreenchange', this.fullscreenHandler);
+    document.addEventListener('MSFullscreenChange', this.fullscreenHandler);
+
+    // Initial check
+    this.handleFullscreenChange();
+  }
+
+  handleFullscreenChange() {
+    const isFullscreen =
+      document.fullscreenElement ||
+      document.webkitFullscreenElement ||
+      document.mozFullScreenElement ||
+      document.msFullscreenElement;
+
+    if (this.element) {
+      this.element.style.display = isFullscreen ? 'none' : 'flex';
+    }
   }
 
   setupEventListeners() {
     // Hover effects
     this.element.addEventListener('mouseenter', () => {
-      this.element.style.transform = 'translateZ(0) scale(1.05)';
-      this.element.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
-      this.element.style.backgroundColor = SPOTIFY_COLORS.HOVER;
+      if (!this.isDragging) {
+        this.element.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+        this.element.style.backgroundColor = SPOTIFY_COLORS.HOVER;
+      }
     });
 
     this.element.addEventListener('mouseleave', () => {
-      this.element.style.transform = 'translateZ(0) scale(1)';
-      this.element.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-      this.element.style.backgroundColor = SPOTIFY_COLORS.PRIMARY;
-    });
-
-    // Click effects
-    this.element.addEventListener('mousedown', () => {
-      this.element.style.transform = 'translateZ(0) scale(0.98)';
-      this.element.style.boxShadow = '0 3px 8px rgba(0,0,0,0.3)';
-    });
-
-    this.element.addEventListener('mouseup', () => {
-      this.element.style.transform = 'translateZ(0) scale(1.05)';
-      this.element.style.boxShadow = '0 6px 16px rgba(0,0,0,0.4)';
+      if (!this.isDragging) {
+        this.element.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
+        this.element.style.backgroundColor = SPOTIFY_COLORS.PRIMARY;
+      }
     });
 
     // Main click handler
-    this.element.addEventListener('click', () => this.handleClick());
+    this.element.addEventListener('click', (e) => {
+      // Only handle click if we're not dragging
+      if (!this.isDragging) {
+        this.handleClick();
+      }
+    });
   }
 
   async handleClick() {
@@ -474,7 +697,7 @@ function createSongSelectionModal(searchResults) {
 // Function to add selected song
 function addSelectedSong(track) {
   const button = document.getElementById('add-to-spotify-btn');
-  const toast = new Toast();
+  const toast = new Toast(button);
   toast.create();
 
   toast.show(`Adding "${track.artist} - ${track.name}"...`, { type: 'loading', duration: 0 });

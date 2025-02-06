@@ -1,72 +1,387 @@
 <!doctype html>
 <html>
   <head>
-    <title>YouTube to Spotify</title>
+    <title>YouTube to Spotify Settings</title>
     <style>
       body {
-        width: 300px;
-        padding: 15px;
-        font-family: Arial, sans-serif;
+        width: 360px;
+        padding: 16px;
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          Oxygen, Ubuntu, Cantarell, sans-serif;
+        color: #333;
       }
+
       .container {
-        text-align: center;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
       }
-      .title {
+
+      .header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 8px;
+      }
+
+      .header img {
+        width: 32px;
+        height: 32px;
+      }
+
+      .header h1 {
+        font-size: 18px;
+        margin: 0;
         color: #1db954;
-        margin-bottom: 15px;
+        flex: 1;
       }
-      .status {
-        margin: 10px 0;
-        padding: 10px;
-        border-radius: 5px;
-        background-color: #f5f5f5;
+
+      .connection-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        margin-bottom: 8px;
       }
-      .button {
-        background-color: #1db954;
+
+      .status-icon {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+      }
+
+      .status-icon.connected {
+        background: #1db954;
+        box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.2);
+      }
+
+      .status-icon.disconnected {
+        background: #dc3545;
+        box-shadow: 0 0 0 2px rgba(220, 53, 69, 0.2);
+      }
+
+      .status-text {
+        flex: 1;
+        font-size: 14px;
+      }
+
+      .disconnect-button {
+        background: #dc3545;
         color: white;
         border: none;
-        padding: 10px 20px;
-        border-radius: 20px;
+        padding: 6px 12px;
+        border-radius: 16px;
+        font-size: 12px;
         cursor: pointer;
-        font-weight: bold;
-        margin-top: 10px;
+        transition: all 0.2s ease;
       }
-      .button:hover {
-        background-color: #1ed760;
+
+      .disconnect-button:hover {
+        background: #c82333;
       }
-      .input-group {
-        margin: 15px 0;
+
+      .setup-section {
         display: none;
       }
-      .input-group.show {
+
+      .setup-section.show {
         display: block;
       }
-      .input-field {
-        width: 90%;
+
+      .setup-section > * + * {
+        margin-top: 24px;
+      }
+
+      .info-box {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 16px;
+        font-size: 13px;
+      }
+
+      .info-box h2 {
+        font-size: 14px;
+        margin: 0 0 8px 0;
+      }
+
+      .info-box code {
+        display: block;
+        background: #fff;
         padding: 8px;
-        border: 1px solid #ccc;
+        border: 1px solid #e9ecef;
         border-radius: 4px;
-        margin-bottom: 10px;
+        margin: 12px 0;
+        word-break: break-all;
+        font-family: monospace;
+        font-size: 12px;
+      }
+
+      .input-group {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+
+      .input-group label {
+        font-size: 14px;
+        font-weight: 500;
+      }
+
+      input {
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 14px;
+        width: 100%;
+        box-sizing: border-box;
+      }
+
+      input:focus {
+        outline: none;
+        border-color: #1db954;
+        box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.1);
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 8px;
+        margin-top: 24px;
+      }
+
+      .button {
+        flex: 1;
+        padding: 10px 16px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .button.primary {
+        background: #1db954;
+        color: white;
+      }
+
+      .button.primary:hover {
+        background: #1ed760;
+      }
+
+      .button.secondary {
+        background: #e9ecef;
+        color: #333;
+      }
+
+      .button.secondary:hover {
+        background: #dee2e6;
+      }
+
+      #status {
+        padding: 12px;
+        border-radius: 6px;
+        font-size: 13px;
+        line-height: 1.4;
+      }
+
+      #status.error {
+        background: #ffebee;
+        color: #c62828;
+      }
+
+      #status.success {
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+
+      .helper-text {
+        margin-top: 12px;
+        font-size: 13px;
+      }
+
+      .helper-text ol {
+        margin: 8px 0;
+        padding-left: 20px;
+      }
+
+      .helper-text li {
+        margin: 4px 0;
+      }
+
+      a {
+        color: #1db954;
+        text-decoration: none;
+      }
+
+      a:hover {
+        text-decoration: underline;
+      }
+
+      .docs-box {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 16px;
+        font-size: 13px;
+        margin-top: 24px;
+      }
+
+      .docs-box h2 {
+        font-size: 14px;
+        margin: 0 0 12px 0;
+        color: #1db954;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .docs-box h2 svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .docs-box ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .docs-box li {
+        margin: 8px 0;
+        line-height: 1.5;
+      }
+
+      .docs-box code {
+        background: #f8f9fa;
+        padding: 2px 4px;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 12px;
+      }
+
+      .docs-box .button {
+        margin-top: 12px;
+        width: auto;
+        justify-content: center;
+        align-items: center;
+        display: inline-flex;
+        gap: 8px;
+        padding: 8px 12px;
+      }
+
+      .docs-box .button svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .docs-box .button-wrapper {
+        margin-top: 16px;
+        text-align: center;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h2 class="title">YouTube to Spotify</h2>
-      <div class="status" id="status">
-        Click the green button on YouTube video pages to add songs to your
-        Spotify playlist.
+      <div class="header">
+        <img src="icons/icon32.png" alt="Logo" />
+        <h1>YouTube to Spotify</h1>
       </div>
-      <div class="input-group" id="client-id-group">
-        <input
-          type="text"
-          id="client-id-input"
-          class="input-field"
-          placeholder="Enter your Spotify Client ID"
-        />
+
+      <div class="connection-status">
+        <div id="status-icon" class="status-icon disconnected"></div>
+        <div id="status-text" class="status-text">Not connected to Spotify</div>
+        <button
+          id="disconnect-button"
+          class="disconnect-button"
+          style="display: none"
+        >
+          Disconnect
+        </button>
       </div>
-      <button class="button" id="auth-button">Connect Spotify</button>
+
+      <div id="setup-section" class="setup-section show">
+        <div class="info-box">
+          <h2>Spotify Dashboard Settings</h2>
+          <p>Add this Redirect URI to your Spotify Dashboard:</p>
+          <code id="redirect-uri"></code>
+          <button id="copy-uri" class="button secondary">
+            Copy to Clipboard
+          </button>
+        </div>
+
+        <div class="input-group">
+          <label for="client-id">Spotify Client ID</label>
+          <input
+            type="text"
+            id="client-id"
+            placeholder="Enter your Spotify Client ID"
+            spellcheck="false"
+          />
+        </div>
+
+        <div class="action-buttons">
+          <button id="save-button" class="button primary">
+            Connect to Spotify
+          </button>
+        </div>
+
+        <div class="docs-box">
+          <h2>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <circle cx="12" cy="12" r="10"></circle>
+              <line x1="12" y1="16" x2="12" y2="12"></line>
+              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+            </svg>
+            How to Get Started
+          </h2>
+          <ol>
+            <li>Go to Spotify Developer Dashboard and create a new app</li>
+            <li>Copy the <code>Client ID</code> from your app settings</li>
+            <li>Add the Redirect URI shown above to your app settings</li>
+            <li>Paste your Client ID here and click Connect</li>
+          </ol>
+          <div class="button-wrapper">
+            <a
+              href="https://developer.spotify.com/dashboard"
+              target="_blank"
+              class="button secondary"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <path
+                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                ></path>
+                <polyline points="15 3 21 3 21 9"></polyline>
+                <line x1="10" y1="14" x2="21" y2="3"></line>
+              </svg>
+              Open Spotify Developer Dashboard
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <div id="status"></div>
     </div>
+
     <script src="popup.js"></script>
   </body>
 </html>
