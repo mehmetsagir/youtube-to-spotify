@@ -446,36 +446,64 @@ class SpotifyButton {
   }
 
   async handleClick() {
-    const songInfo = getSongInfo();
-    if (!songInfo) {
-      this.toast.create().show('Could not detect song information!', { type: 'error' });
-      return;
-    }
+    // First check if connected to Spotify
+    try {
+      const storage = await chrome.storage.local.get(['spotify_token', 'client_id']);
 
-    // Disable button during process
-    this.setLoading(true);
-
-    // Show progress
-    this.toast.create();
-    await this.toast.show(`Searching for "${songInfo.artist} - ${songInfo.song}"...`, { type: 'loading', duration: 0 });
-
-    // Send song info to background script
-    chrome.runtime.sendMessage({ type: 'ADD_TO_SPOTIFY', data: songInfo }, async response => {
-      this.setLoading(false);
-
-      if (response?.success) {
-        // Direct match found and added
-        await this.handleSuccess(response.trackInfo);
-      } else if (response?.searchResults?.length > 0) {
-        // Multiple matches found
-        await this.toast.hide();
-        createSongSelectionModal(response.searchResults);
-      } else {
-        // Error or no matches
-        const errorMessage = response?.error || 'No matching songs found on Spotify';
-        await this.toast.show(`Error: ${errorMessage}`, { type: 'error' });
+      if (!storage.spotify_token || !storage.client_id) {
+        // Not connected, open popup
+        chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
+        this.toast.create().show('Please connect your Spotify account first', { type: 'info' });
+        return;
       }
-    });
+
+      // Check if token is valid
+      const response = await fetch('https://api.spotify.com/v1/me', {
+        headers: { 'Authorization': `Bearer ${storage.spotify_token}` }
+      });
+
+      if (!response.ok) {
+        // Token invalid, open popup
+        chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
+        this.toast.create().show('Spotify connection expired. Please reconnect.', { type: 'info' });
+        return;
+      }
+
+      // If we're here, we're connected. Proceed with normal flow
+      const songInfo = getSongInfo();
+      if (!songInfo) {
+        this.toast.create().show('Could not detect song information!', { type: 'error' });
+        return;
+      }
+
+      // Disable button during process
+      this.setLoading(true);
+
+      // Show progress
+      this.toast.create();
+      await this.toast.show(`Searching for "${songInfo.artist} - ${songInfo.song}"...`, { type: 'loading', duration: 0 });
+
+      // Send song info to background script
+      chrome.runtime.sendMessage({ type: 'ADD_TO_SPOTIFY', data: songInfo }, async response => {
+        this.setLoading(false);
+
+        if (response?.success) {
+          // Direct match found and added
+          await this.handleSuccess(response.trackInfo);
+        } else if (response?.searchResults?.length > 0) {
+          // Multiple matches found
+          await this.toast.hide();
+          createSongSelectionModal(response.searchResults);
+        } else {
+          // Error or no matches
+          const errorMessage = response?.error || 'No matching songs found on Spotify';
+          await this.toast.show(`Error: ${errorMessage}`, { type: 'error' });
+        }
+      });
+    } catch (error) {
+      this.toast.create().show('An error occurred. Please try again.', { type: 'error' });
+      console.error('Error in handleClick:', error);
+    }
   }
 
   setLoading(isLoading) {

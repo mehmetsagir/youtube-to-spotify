@@ -4,18 +4,23 @@
     <title>YouTube to Spotify Settings</title>
     <style>
       body {
-        width: 360px;
+        width: 100%;
+        max-width: 480px;
+        min-width: 360px;
         padding: 16px;
         margin: 0;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
           Oxygen, Ubuntu, Cantarell, sans-serif;
         color: #333;
+        box-sizing: border-box;
       }
 
       .container {
         display: flex;
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
+        width: 100%;
+        margin: 0 auto;
       }
 
       .header {
@@ -44,7 +49,7 @@
         padding: 12px;
         background: #f8f9fa;
         border-radius: 8px;
-        margin-bottom: 8px;
+        margin-bottom: 0;
       }
 
       .status-icon {
@@ -101,6 +106,7 @@
         border-radius: 8px;
         padding: 16px;
         font-size: 13px;
+        margin-bottom: 16px;
       }
 
       .info-box h2 {
@@ -118,13 +124,16 @@
         word-break: break-all;
         font-family: monospace;
         font-size: 12px;
+        width: 100%;
+        box-sizing: border-box;
+        overflow-x: auto;
       }
 
       .input-group {
         display: flex;
         flex-direction: column;
         gap: 8px;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
       }
 
       .input-group label {
@@ -139,6 +148,7 @@
         font-size: 14px;
         width: 100%;
         box-sizing: border-box;
+        min-width: 0;
       }
 
       input:focus {
@@ -150,7 +160,7 @@
       .action-buttons {
         display: flex;
         gap: 8px;
-        margin-top: 24px;
+        margin-top: 0;
       }
 
       .button {
@@ -282,6 +292,256 @@
         margin-top: 16px;
         text-align: center;
       }
+
+      .welcome-box {
+        background: #f8f9fa;
+        border-radius: 8px;
+        padding: 20px;
+        margin-bottom: 16px;
+      }
+
+      .welcome-box h2 {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        color: #1db954;
+        margin: 0 0 12px 0;
+        font-size: 16px;
+      }
+
+      .welcome-box p {
+        margin: 0 0 16px 0;
+        line-height: 1.5;
+        color: #4a4a4a;
+      }
+
+      .features {
+        background: white;
+        border-radius: 6px;
+        padding: 16px;
+        margin-top: 16px;
+      }
+
+      .features h3 {
+        margin: 0 0 12px 0;
+        font-size: 14px;
+        color: #333;
+      }
+
+      .features ul {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .features li {
+        margin: 8px 0;
+        color: #4a4a4a;
+        font-size: 13px;
+      }
+
+      .setup-steps {
+        margin-bottom: 24px;
+      }
+
+      .setup-steps h3 {
+        margin: 0 0 16px 0;
+        font-size: 14px;
+        color: #333;
+      }
+
+      .setup-steps ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .setup-steps li {
+        margin: 16px 0;
+        color: #4a4a4a;
+        font-size: 13px;
+      }
+
+      .setup-steps strong {
+        color: #1db954;
+        display: block;
+        margin-bottom: 4px;
+      }
+
+      .setup-steps p {
+        margin: 4px 0 0 0;
+        line-height: 1.4;
+      }
+
+      .docs-box ul {
+        margin: 8px 0;
+        padding-left: 24px;
+        font-size: 12px;
+        color: #666;
+      }
+
+      .docs-box ul li {
+        margin: 4px 0;
+      }
+
+      .accordion {
+        margin-top: 8px;
+      }
+
+      .accordion-header {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 12px 16px;
+        font-size: 14px;
+        font-weight: 500;
+        color: #1db954;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        transition: all 0.2s ease;
+        user-select: none;
+      }
+
+      .accordion-header:hover {
+        background: #f8f9fa;
+      }
+
+      .accordion-header svg {
+        width: 16px;
+        height: 16px;
+        transition: transform 0.3s ease;
+      }
+
+      .accordion-content {
+        background: #fff;
+        border: 1px solid #e9ecef;
+        border-top: none;
+        border-radius: 0 0 8px 8px;
+        padding: 0;
+        max-height: 0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+        opacity: 0;
+        visibility: hidden;
+      }
+
+      .accordion-section {
+        margin-bottom: 8px;
+      }
+
+      .accordion-section.active .accordion-header {
+        border-radius: 8px 8px 0 0;
+      }
+
+      .accordion-section.active .accordion-header svg {
+        transform: rotate(180deg);
+      }
+
+      .accordion-section.active .accordion-content {
+        padding: 16px;
+        max-height: none;
+        opacity: 1;
+        visibility: visible;
+        border-top: 1px solid #e9ecef;
+      }
+
+      .accordion-content .features {
+        background: transparent;
+        padding: 0;
+        margin: 0;
+      }
+
+      .accordion-content .button-wrapper {
+        margin-top: 16px;
+        text-align: center;
+      }
+
+      .accordion-content .button-wrapper .button {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        font-size: 13px;
+        width: auto;
+      }
+
+      .accordion-content .button-wrapper .button svg {
+        width: 16px;
+        height: 16px;
+      }
+
+      .accordion-content ul {
+        margin: 0;
+        padding-left: 20px;
+        list-style-type: disc;
+      }
+
+      .accordion-content ul li {
+        margin: 8px 0;
+        color: #4a4a4a;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .accordion-content ol {
+        margin: 0;
+        padding-left: 20px;
+        list-style-type: decimal;
+      }
+
+      .accordion-content ol li {
+        margin: 8px 0;
+        color: #4a4a4a;
+        font-size: 13px;
+        line-height: 1.5;
+      }
+
+      .accordion-content p {
+        margin: 0 0 12px 0;
+        line-height: 1.5;
+        color: #4a4a4a;
+        font-size: 13px;
+      }
+
+      .accordion-content a {
+        color: #1db954;
+        text-decoration: none;
+      }
+
+      .accordion-content a:hover {
+        text-decoration: underline;
+      }
+
+      .accordion-content ul ul {
+        margin-top: 8px;
+        margin-bottom: 8px;
+      }
+
+      .essential-info {
+        margin-bottom: 16px;
+      }
+
+      .button-wrapper {
+        margin-top: 16px;
+        text-align: center;
+      }
+
+      .button-wrapper .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        padding: 10px 16px;
+        font-size: 13px;
+        width: auto;
+        margin: 0 auto;
+      }
+
+      .button-wrapper .button svg {
+        width: 16px;
+        height: 16px;
+        flex-shrink: 0;
+      }
     </style>
   </head>
   <body>
@@ -304,77 +564,196 @@
       </div>
 
       <div id="setup-section" class="setup-section show">
-        <div class="info-box">
-          <h2>Spotify Dashboard Settings</h2>
-          <p>Add this Redirect URI to your Spotify Dashboard:</p>
-          <code id="redirect-uri"></code>
-          <button id="copy-uri" class="button secondary">
-            Copy to Clipboard
-          </button>
-        </div>
-
-        <div class="input-group">
-          <label for="client-id">Spotify Client ID</label>
-          <input
-            type="text"
-            id="client-id"
-            placeholder="Enter your Spotify Client ID"
-            spellcheck="false"
-          />
-        </div>
-
-        <div class="action-buttons">
-          <button id="save-button" class="button primary">
-            Connect to Spotify
-          </button>
-        </div>
-
-        <div class="docs-box">
+        <div class="welcome-box">
           <h2>
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+              width="20"
+              height="20"
+              fill="currentColor"
             >
-              <circle cx="12" cy="12" r="10"></circle>
-              <line x1="12" y1="16" x2="12" y2="12"></line>
-              <line x1="12" y1="8" x2="12.01" y2="8"></line>
+              <path
+                d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"
+              />
             </svg>
-            How to Get Started
+            Welcome to YouTube to Spotify!
           </h2>
-          <ol>
-            <li>Go to Spotify Developer Dashboard and create a new app</li>
-            <li>Copy the <code>Client ID</code> from your app settings</li>
-            <li>Add the Redirect URI shown above to your app settings</li>
-            <li>Paste your Client ID here and click Connect</li>
-          </ol>
-          <div class="button-wrapper">
-            <a
-              href="https://developer.spotify.com/dashboard"
-              target="_blank"
-              class="button secondary"
-            >
+          <p>
+            This extension allows you to easily add songs from YouTube videos to
+            your Spotify playlist. To get started, you'll need to connect your
+            Spotify account.
+          </p>
+        </div>
+
+        <div class="essential-info">
+          <div class="info-box">
+            <h2>Spotify Dashboard Settings</h2>
+            <p>Add this Redirect URI to your Spotify Dashboard:</p>
+            <code id="redirect-uri"></code>
+            <button id="copy-uri" class="button secondary">
+              Copy to Clipboard
+            </button>
+          </div>
+
+          <div class="input-group">
+            <label for="client-id">Spotify Client ID</label>
+            <input
+              type="text"
+              id="client-id"
+              placeholder="Enter your Spotify Client ID"
+              spellcheck="false"
+            />
+          </div>
+
+          <div class="action-buttons">
+            <button id="save-button" class="button primary">
+              Connect to Spotify
+            </button>
+          </div>
+        </div>
+
+        <div class="accordion">
+          <div class="accordion-section">
+            <div class="accordion-header">
+              <span>Features & Capabilities</span>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
                 stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
               >
-                <path
-                  d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
-                ></path>
-                <polyline points="15 3 21 3 21 9"></polyline>
-                <line x1="10" y1="14" x2="21" y2="3"></line>
+                <polyline points="6 9 12 15 18 9"></polyline>
               </svg>
-              Open Spotify Developer Dashboard
-            </a>
+            </div>
+            <div class="accordion-content">
+              <div class="features">
+                <ul>
+                  <li>
+                    Add any song from YouTube directly to your Spotify playlist
+                  </li>
+                  <li>Smart song matching with artist and title detection</li>
+                  <li>Choose from multiple matches if available</li>
+                  <li>
+                    Automatically creates a "YouTube Songs" playlist in your
+                    Spotify
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-section">
+            <div class="accordion-header">
+              <span>Setup Guide</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+            <div class="accordion-content">
+              <ol>
+                <li>
+                  Visit the
+                  <a
+                    href="https://developer.spotify.com/dashboard"
+                    target="_blank"
+                    >Spotify Developer Dashboard</a
+                  >
+                </li>
+                <li>
+                  Click "Create app" and fill in the details:
+                  <ul>
+                    <li>
+                      App name: Choose any name (e.g., "YouTube to Spotify")
+                    </li>
+                    <li>
+                      App description: Brief description of what the app does
+                    </li>
+                    <li>Website: You can leave this blank</li>
+                    <li>Redirect URI: Copy the URI shown above</li>
+                  </ul>
+                </li>
+                <li>
+                  After creating the app, you'll be redirected to the app's
+                  dashboard
+                </li>
+                <li>
+                  To find your Client ID:
+                  <ul>
+                    <li>
+                      Look for "Client ID" in the app's basic information
+                      section
+                    </li>
+                    <li>
+                      Or click on "Settings" and find it at the top of the page
+                    </li>
+                    <li>Click the "Copy" button next to the Client ID</li>
+                  </ul>
+                </li>
+                <li>Paste the copied Client ID into the input field above</li>
+                <li>Click "Connect to Spotify" to finish setup</li>
+              </ol>
+              <div class="button-wrapper">
+                <a
+                  href="https://developer.spotify.com/dashboard"
+                  target="_blank"
+                  class="button secondary"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path
+                      d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"
+                    ></path>
+                    <polyline points="15 3 21 3 21 9"></polyline>
+                    <line x1="10" y1="14" x2="21" y2="3"></line>
+                  </svg>
+                  Open Spotify Developer Dashboard
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div class="accordion-section">
+            <div class="accordion-header">
+              <span>Why Do I Need This?</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <polyline points="6 9 12 15 18 9"></polyline>
+              </svg>
+            </div>
+            <div class="accordion-content">
+              <p>
+                To securely connect with your Spotify account, this extension
+                needs a Client ID. This is a standard security requirement from
+                Spotify to ensure your account's safety. The Client ID is like a
+                key that:
+              </p>
+              <ul>
+                <li>Allows secure connection to your Spotify account</li>
+                <li>Ensures only authorized apps can access your playlists</li>
+                <li>Protects your account information</li>
+                <li>Follows Spotify's security best practices</li>
+              </ul>
+            </div>
           </div>
         </div>
       </div>

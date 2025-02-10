@@ -9,6 +9,29 @@ document.addEventListener('DOMContentLoaded', async () => {
   const statusTextElement = document.getElementById('status-text');
   const disconnectButton = document.getElementById('disconnect-button');
 
+  // Add accordion functionality
+  const accordionHeaders = document.querySelectorAll('.accordion-header');
+
+  accordionHeaders.forEach(header => {
+    header.addEventListener('click', () => {
+      // Close all other sections
+      accordionHeaders.forEach(otherHeader => {
+        if (otherHeader !== header) {
+          otherHeader.parentElement.classList.remove('active');
+        }
+      });
+
+      // Toggle current section
+      const section = header.parentElement;
+      section.classList.toggle('active');
+    });
+  });
+
+  // Open first accordion by default
+  if (accordionHeaders.length > 0) {
+    accordionHeaders[0].parentElement.classList.add('active');
+  }
+
   // Display Redirect URI
   const redirectUri = chrome.identity.getRedirectURL();
   redirectUriElement.textContent = redirectUri;

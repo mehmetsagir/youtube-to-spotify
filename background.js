@@ -443,6 +443,16 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   } else if (request.type === 'ADD_SELECTED_SONG') {
     handleSelectedSong(request.data, sendResponse);
     return true; // Keep the message channel open for async response
+  } else if (request.type === 'OPEN_POPUP') {
+    // Open the extension popup
+    chrome.windows.create({
+      url: 'popup.html',
+      type: 'popup',
+      width: 400,
+      height: 500,
+      focused: true
+    });
+    return false; // No async response needed
   }
 });
 
