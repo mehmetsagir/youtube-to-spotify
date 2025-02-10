@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YouTube to Spotify",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "author": "Mehmet Sağır",
   "description": "Add YouTube songs to your Spotify playlist with one click",
   "permissions": [
