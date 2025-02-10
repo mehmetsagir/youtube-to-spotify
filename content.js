@@ -54,44 +54,44 @@ class Toast {
     this.element = document.createElement('div');
     this.element.id = 'spotify-toast';
     this.element.style.cssText = `
-      position: fixed;
+    position: fixed;
       background-color: ${SPOTIFY_COLORS.DARK};
-      color: white;
-      padding: 15px 20px;
-      border-radius: 8px;
-      z-index: 9999;
-      font-family: Arial, sans-serif;
-      min-width: 200px;
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    z-index: 9999;
+    font-family: Arial, sans-serif;
+    min-width: 200px;
       max-width: 300px;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      opacity: 0;
-      transition: opacity 0.3s ease;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
       word-wrap: break-word;
       box-sizing: border-box;
-    `;
+  `;
 
     // Create spinner
     this.spinner = document.createElement('div');
     this.spinner.style.cssText = `
-      width: 20px;
-      height: 20px;
+    width: 20px;
+    height: 20px;
       border: 2px solid ${SPOTIFY_COLORS.PRIMARY};
-      border-radius: 50%;
-      border-top-color: transparent;
-      animation: spin 1s linear infinite;
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s linear infinite;
       flex-shrink: 0;
-    `;
+  `;
 
     // Add spinner animation
     const style = document.createElement('style');
     style.textContent = `
-      @keyframes spin {
-        to { transform: rotate(360deg); }
-      }
-    `;
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+  `;
     document.head.appendChild(style);
 
     // Create message element
@@ -201,20 +201,72 @@ class SpotifyButton {
     this.yOffset = 0;
     this.longPressTimer = null;
     this.longPressDuration = 500; // 500ms for long press
+    this.handleResize = this.handleResize.bind(this);
   }
 
   async create() {
+    // Check if button already exists
+    if (document.getElementById('spotify-button-container')) {
+      return;
+    }
+
     if (document.getElementById('add-to-spotify-btn')) return;
 
     const spotifyIcon = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 8px;">
-        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
-      </svg>
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 0">
+      <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
+    </svg>
+  `;
+
+    const dragHandle = `
+      <div class="drag-handle" title="Drag to move button">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="7" r="1" fill="currentColor"/>
+          <circle cx="12" cy="12" r="1" fill="currentColor"/>
+          <circle cx="12" cy="17" r="1" fill="currentColor"/>
+          <circle cx="17" cy="7" r="1" fill="currentColor"/>
+          <circle cx="17" cy="12" r="1" fill="currentColor"/>
+          <circle cx="17" cy="17" r="1" fill="currentColor"/>
+          <circle cx="7" cy="7" r="1" fill="currentColor"/>
+          <circle cx="7" cy="12" r="1" fill="currentColor"/>
+          <circle cx="7" cy="17" r="1" fill="currentColor"/>
+        </svg>
+      </div>
+      <div class="reset-handle" title="Reset position">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </div>
+      <div class="toggle-handle" title="Toggle button style">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+      </div>
+    `;
+
+    const buttonContainer = document.createElement('div');
+    buttonContainer.id = 'spotify-button-container';
+    buttonContainer.style.cssText = `
+    position: fixed;
+      z-index: 9999999;
+      display: flex;
+      align-items: center;
+      gap: 8px;
     `;
 
     this.element = document.createElement('button');
     this.element.id = 'add-to-spotify-btn';
-    this.element.innerHTML = `${spotifyIcon}Add to Spotify`;
+    this.element.innerHTML = spotifyIcon;
+
+    // Load button style preference
+    const storage = await chrome.storage.local.get('spotify_button_style');
+    const showText = storage.spotify_button_style !== 'icon_only';
+    this.updateButtonStyle(showText);
+
+    buttonContainer.appendChild(this.element);
+    buttonContainer.insertAdjacentHTML('beforeend', dragHandle);
 
     // Load saved position
     const position = await this.loadPosition();
@@ -222,7 +274,6 @@ class SpotifyButton {
     // Set initial position
     if (position.x === 0 && position.y === 0) {
       // If no saved position, place it at the bottom right
-      const rect = this.element.getBoundingClientRect();
       this.xOffset = window.innerWidth - 200; // 200px from right
       this.yOffset = window.innerHeight - 100; // 100px from bottom
     } else {
@@ -232,83 +283,209 @@ class SpotifyButton {
 
     this.setupStyles();
     this.setupEventListeners();
-    this.setupDragListeners();
-    document.body.appendChild(this.element);
+    this.setupDragListeners(buttonContainer);
+    document.body.appendChild(buttonContainer);
     this.setupFullscreenHandlers();
+    this.setupResizeHandler(buttonContainer);
 
     // Make sure the button is visible
-    this.element.style.display = 'flex';
-    this.element.style.visibility = 'visible';
+    buttonContainer.style.display = 'flex';
+    buttonContainer.style.visibility = 'visible';
 
     // Apply position
-    this.setTranslate(this.xOffset, this.yOffset);
+    this.setTranslate(this.xOffset, this.yOffset, buttonContainer);
 
-    this.toast = new Toast(this.element); // Create toast with button reference
+    this.toast = new Toast(this.element);
   }
 
   setupStyles() {
     this.element.style.cssText = `
-      position: fixed;
       background-color: ${SPOTIFY_COLORS.PRIMARY};
-      color: white;
-      border: none;
-      border-radius: 24px;
-      padding: 12px 24px;
-      cursor: grab;
-      font-weight: 600;
-      font-size: 14px;
-      z-index: 9999999;
-      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    color: white;
+    border: none;
+    border-radius: 24px;
+      height: 36px;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 14px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
       transition: background-color 0.3s ease, box-shadow 0.3s ease;
-      touch-action: none;
       user-select: none;
       -webkit-user-select: none;
       -webkit-touch-callout: none;
-      letter-spacing: 0.3px;
-      text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-      min-width: 160px;
+    letter-spacing: 0.3px;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
       will-change: transform;
       pointer-events: auto;
       opacity: 1;
       visibility: visible;
     `;
+
+    // Add styles for drag handle
+    const style = document.createElement('style');
+    style.textContent = `
+      .drag-handle {
+        width: 28px;
+        height: 28px;
+        background: rgba(128, 128, 128, 0.15);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        opacity: 0;
+        transition: all 0.2s ease;
+      }
+
+      .drag-handle:hover {
+        background: rgba(128, 128, 128, 0.25);
+      }
+
+      .drag-handle:active {
+        cursor: grabbing;
+        background: rgba(128, 128, 128, 0.35);
+      }
+
+      .reset-handle,
+      .toggle-handle {
+        width: 28px;
+        height: 28px;
+        background: rgba(128, 128, 128, 0.15);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        opacity: 0;
+        transition: all 0.2s ease;
+        margin-left: 4px;
+      }
+
+      .reset-handle:hover,
+      .toggle-handle:hover {
+        background: rgba(128, 128, 128, 0.25);
+      }
+
+      .reset-handle:active,
+      .toggle-handle:active {
+        background: rgba(128, 128, 128, 0.35);
+      }
+
+      #spotify-button-container:hover .drag-handle,
+      #spotify-button-container:hover .reset-handle,
+      #spotify-button-container:hover .toggle-handle {
+        opacity: 1;
+      }
+
+      .drag-handle svg,
+      .reset-handle svg,
+      .toggle-handle svg {
+        width: 16px;
+        height: 16px;
+        color: rgba(255, 255, 255, 0.8);
+        opacity: 0.8;
+      }
+
+      .drag-handle:hover svg,
+      .reset-handle:hover svg,
+      .toggle-handle:hover svg {
+        opacity: 1;
+      }
+
+      #add-to-spotify-btn {
+        transition: all 0.3s ease;
+        border-radius: 24px;
+        height: 36px;
+        width: auto;
+      }
+
+      #add-to-spotify-btn.icon-only {
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      #add-to-spotify-btn.icon-only svg {
+        margin-right: 0;
+        width: 16px;
+        height: 16px;
+      }
+
+      #add-to-spotify-btn svg {
+        transition: all 0.3s ease;
+      }
+    `;
+    document.head.appendChild(style);
   }
 
-  setupDragListeners() {
-    let isDraggable = false;
-    let hasMoved = false;
-    let pressTimer = null;
+  setupDragListeners(container) {
+    const dragHandle = container.querySelector('.drag-handle');
+    const resetHandle = container.querySelector('.reset-handle');
+    const toggleHandle = container.querySelector('.toggle-handle');
+    let isDragging = false;
+
+    // Toggle button style handler
+    toggleHandle.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const storage = await chrome.storage.local.get('spotify_button_style');
+      const showText = storage.spotify_button_style === 'icon_only';
+      await chrome.storage.local.set({ 'spotify_button_style': showText ? 'with_text' : 'icon_only' });
+      this.updateButtonStyle(showText);
+    });
+
+    // Reset button click handler
+    resetHandle.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // Default position (bottom right)
+      this.xOffset = window.innerWidth - 200; // 200px from right
+      this.yOffset = window.innerHeight - 100; // 100px from bottom
+
+      // Apply position with animation
+      container.style.transition = 'transform 0.3s ease';
+      this.setTranslate(this.xOffset, this.yOffset, container);
+
+      // Save the position
+      await this.savePosition(this.xOffset, this.yOffset);
+
+      // Reset transition after animation
+      setTimeout(() => {
+        container.style.transition = '';
+      }, 300);
+    });
 
     const handleDragStart = (e) => {
       if (e.type === 'mousedown' && e.button !== 0) return; // Only left click
       e.preventDefault();
       e.stopPropagation();
 
-      hasMoved = false;
+      isDragging = true;
+      container.setAttribute('data-dragging', 'true');
+      dragHandle.style.cursor = 'grabbing';
+      container.style.transition = 'none';
+
       const startX = e.type === 'mousedown' ? e.clientX : e.touches[0].clientX;
       const startY = e.type === 'mousedown' ? e.clientY : e.touches[0].clientY;
 
-      pressTimer = setTimeout(() => {
-        isDraggable = true;
-        this.isDragging = true;
-        this.element.style.cursor = 'grabbing';
-        this.element.style.transition = 'none';
-
-        this.initialX = startX - this.xOffset;
-        this.initialY = startY - this.yOffset;
-      }, 500);
+      this.initialX = startX - this.xOffset;
+      this.initialY = startY - this.yOffset;
     };
 
     const handleDragMove = (e) => {
-      if (!isDraggable || !this.isDragging) return;
+      if (!isDragging) return;
       e.preventDefault();
       e.stopPropagation();
 
-      hasMoved = true;
       const clientX = e.type === 'mousemove' ? e.clientX : e.touches[0].clientX;
       const clientY = e.type === 'mousemove' ? e.clientY : e.touches[0].clientY;
 
@@ -318,54 +495,37 @@ class SpotifyButton {
       this.xOffset = this.currentX;
       this.yOffset = this.currentY;
 
-      this.setTranslate(this.currentX, this.currentY);
+      this.setTranslate(this.currentX, this.currentY, container);
     };
 
-    const handleDragEnd = (e) => {
-      clearTimeout(pressTimer);
+    const handleDragEnd = () => {
+      if (!isDragging) return;
 
-      if (this.isDragging && hasMoved) {
-        e.preventDefault();
-        e.stopPropagation();
+      isDragging = false;
+      container.setAttribute('data-dragging', 'false');
+      dragHandle.style.cursor = 'grab';
+      container.style.transition = 'box-shadow 0.3s ease';
 
-        // Prevent the upcoming click event
-        const preventClick = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          e.stopImmediatePropagation();
-          this.element.removeEventListener('click', preventClick, true);
-        };
-        this.element.addEventListener('click', preventClick, true);
-      }
-
-      this.isDragging = false;
-      isDraggable = false;
-
-      this.element.style.cursor = 'grab';
-      this.element.style.transition = 'box-shadow 0.3s ease';
-
-      if (hasMoved) {
-        this.savePosition(this.xOffset, this.yOffset);
-      }
+      this.savePosition(this.xOffset, this.yOffset);
     };
 
     // Mouse events
-    this.element.addEventListener('mousedown', handleDragStart);
+    dragHandle.addEventListener('mousedown', handleDragStart);
     document.addEventListener('mousemove', handleDragMove);
     document.addEventListener('mouseup', handleDragEnd);
 
     // Touch events
-    this.element.addEventListener('touchstart', handleDragStart, { passive: false });
+    dragHandle.addEventListener('touchstart', handleDragStart, { passive: false });
     document.addEventListener('touchmove', handleDragMove, { passive: false });
     document.addEventListener('touchend', handleDragEnd);
     document.addEventListener('touchcancel', handleDragEnd);
 
     // Prevent context menu
-    this.element.addEventListener('contextmenu', e => e.preventDefault());
+    dragHandle.addEventListener('contextmenu', e => e.preventDefault());
   }
 
-  setTranslate(xPos, yPos) {
-    const rect = this.element.getBoundingClientRect();
+  setTranslate(xPos, yPos, container) {
+    const rect = container.getBoundingClientRect();
     const viewportWidth = window.innerWidth;
     const viewportHeight = window.innerHeight;
 
@@ -376,7 +536,7 @@ class SpotifyButton {
     if (yPos > viewportHeight - rect.height) yPos = viewportHeight - rect.height;
 
     // Apply transform
-    this.element.style.transform = `translate(${xPos}px, ${yPos}px)`;
+    container.style.transform = `translate(${xPos}px, ${yPos}px)`;
   }
 
   async savePosition(x, y) {
@@ -512,21 +672,88 @@ class SpotifyButton {
     this.element.style.cursor = isLoading ? 'not-allowed' : 'pointer';
   }
 
+  updateButtonStyle(showText) {
+    const spotifyIcon = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: ${showText ? '8px' : '0'}">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
+      </svg>
+    `;
+
+    this.element.innerHTML = showText ? `${spotifyIcon}Add to Spotify` : spotifyIcon;
+    this.element.className = showText ? '' : 'icon-only';
+
+    // Update padding based on button state
+    this.element.style.padding = showText ? '8px 16px' : '6px';
+  }
+
   async handleSuccess(trackInfo) {
+    const storage = await chrome.storage.local.get('spotify_button_style');
+    const showText = storage.spotify_button_style !== 'icon_only';
     const spotifyIcon = this.element.querySelector('svg').outerHTML;
+
     await this.toast.show(
       `✓ Added "${trackInfo.artist} - ${trackInfo.name}" (${trackInfo.confidence}% match)`,
       { type: 'success' }
     );
 
     // Update button temporarily
-    this.element.innerHTML = `${spotifyIcon}✓ Added`;
+    this.element.innerHTML = showText ? `${spotifyIcon}✓ Added` : spotifyIcon;
     this.element.style.backgroundColor = SPOTIFY_COLORS.BLUE;
 
     // Reset button after delay
     await delay(TOAST_DISPLAY_DURATION);
-    this.element.innerHTML = `${spotifyIcon}Add to Spotify`;
+    this.updateButtonStyle(showText);
     this.element.style.backgroundColor = SPOTIFY_COLORS.PRIMARY;
+  }
+
+  setupResizeHandler(container) {
+    // Add resize event listener
+    window.addEventListener('resize', () => this.handleResize(container));
+  }
+
+  handleResize(container) {
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    const rect = container.getBoundingClientRect();
+    const containerWidth = rect.width;
+    const containerHeight = rect.height;
+
+    // Calculate position as percentage of viewport
+    const rightPercentage = ((viewportWidth - (this.xOffset + containerWidth)) / viewportWidth) * 100;
+    const bottomPercentage = ((viewportHeight - (this.yOffset + containerHeight)) / viewportHeight) * 100;
+
+    // If button was positioned relative to right side (less than 50% from right edge)
+    if (rightPercentage < 50) {
+      // Maintain distance from right edge
+      this.xOffset = viewportWidth - containerWidth - (rightPercentage * viewportWidth / 100);
+    }
+
+    // If button was positioned relative to bottom (less than 50% from bottom edge)
+    if (bottomPercentage < 50) {
+      // Maintain distance from bottom edge
+      this.yOffset = viewportHeight - containerHeight - (bottomPercentage * viewportHeight / 100);
+    }
+
+    // Ensure button stays within viewport bounds
+    if (this.xOffset < 0) this.xOffset = 0;
+    if (this.xOffset > viewportWidth - containerWidth) this.xOffset = viewportWidth - containerWidth;
+    if (this.yOffset < 0) this.yOffset = 0;
+    if (this.yOffset > viewportHeight - containerHeight) this.yOffset = viewportHeight - containerHeight;
+
+    // Apply the new position
+    this.setTranslate(this.xOffset, this.yOffset, container);
+
+    // Save the new position
+    this.savePosition(this.xOffset, this.yOffset);
+  }
+
+  // Update cleanup in the class
+  cleanup() {
+    window.removeEventListener('resize', this.handleResize);
+    document.removeEventListener('fullscreenchange', this.fullscreenHandler);
+    document.removeEventListener('webkitfullscreenchange', this.fullscreenHandler);
+    document.removeEventListener('mozfullscreenchange', this.fullscreenHandler);
+    document.removeEventListener('MSFullscreenChange', this.fullscreenHandler);
   }
 }
 
@@ -758,6 +985,35 @@ function addSelectedSong(track) {
 let lastUrl = location.href;
 let navigationObserver = null;
 
+let isButtonInitialized = false;
+let isProcessingMutation = false;
+
+function removeExistingButton() {
+  const containers = document.querySelectorAll('#spotify-button-container');
+  containers.forEach(container => {
+    const spotifyButton = container.spotifyButton;
+    if (spotifyButton) {
+      spotifyButton.cleanup();
+    }
+    container.remove();
+  });
+  isButtonInitialized = false;
+}
+
+function createOrUpdateButton() {
+  if (isProcessingMutation) return;
+
+  removeExistingButton();
+
+  if (!isButtonInitialized) {
+    isButtonInitialized = true;
+    const spotifyButton = new SpotifyButton();
+    const container = document.createElement('div');
+    container.spotifyButton = spotifyButton; // Store button instance for cleanup
+    spotifyButton.create();
+  }
+}
+
 function setupNavigationObserver() {
   // If there's an existing observer, disconnect it
   if (navigationObserver) {
@@ -766,23 +1022,41 @@ function setupNavigationObserver() {
 
   // Create new observer for the main app container
   navigationObserver = new MutationObserver((mutations) => {
+    // If already processing or button is being dragged, skip
+    if (isProcessingMutation) return;
+
     // Check if URL has changed
     if (location.href !== lastUrl) {
       lastUrl = location.href;
+      isButtonInitialized = false;
       checkAndInitializeButton();
       return;
     }
 
-    // Check for video content changes
-    for (const mutation of mutations) {
-      if (mutation.target.id === 'content' ||
-        mutation.target.id === 'info' ||
-        mutation.target.id === 'container' ||
-        mutation.target.tagName === 'YTD-WATCH-METADATA' ||
-        mutation.target.tagName === 'YTD-WATCH-FLEXY') {
-        checkAndInitializeButton();
-        break;
+    // Don't check for changes if we're dragging the button
+    const container = document.getElementById('spotify-button-container');
+    if (container?.getAttribute('data-dragging') === 'true') {
+      return;
+    }
+
+    // Set processing flag
+    isProcessingMutation = true;
+
+    try {
+      // Check for video content changes
+      for (const mutation of mutations) {
+        if (mutation.target.id === 'content' ||
+          mutation.target.id === 'info' ||
+          mutation.target.id === 'container' ||
+          mutation.target.tagName === 'YTD-WATCH-METADATA' ||
+          mutation.target.tagName === 'YTD-WATCH-FLEXY') {
+          checkAndInitializeButton();
+          break;
+        }
       }
+    } finally {
+      // Reset processing flag
+      isProcessingMutation = false;
     }
   });
 
@@ -851,21 +1125,6 @@ function waitForElements({ selectors, timeout, onSuccess, onTimeout }) {
   checkElements();
 }
 
-function createOrUpdateButton() {
-  const existingButton = document.getElementById('add-to-spotify-btn');
-  if (!existingButton) {
-    const spotifyButton = new SpotifyButton();
-    spotifyButton.create();
-  }
-}
-
-function removeExistingButton() {
-  const existingButton = document.getElementById('add-to-spotify-btn');
-  if (existingButton) {
-    existingButton.remove();
-  }
-}
-
 // Initialize on page load
 function initialize() {
   setupNavigationObserver();
@@ -909,7 +1168,7 @@ function isMusicVideo() {
     }
 
     // Check for music-specific metadata
-    if (['song', 'artist', 'album', 'licensed to youtube by', 'music', 'provided to youtube'].includes(title)) {
+    if (['song', 'artist', 'album', 'licensed to youtube by', 'music', 'provided to youtube by'].includes(title)) {
       hasMusicMetadata = true;
     }
   });
