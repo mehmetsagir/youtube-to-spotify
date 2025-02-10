@@ -1,6 +1,7 @@
 // Constants
-const TOAST_DISPLAY_DURATION = 3000;
-const TOAST_FADE_DURATION = 300;
+const TOAST_DISPLAY_DURATION = 1500;
+const TOAST_FADE_DURATION = 200;
+const BUTTON_RESET_DURATION = 1000;
 const SPOTIFY_COLORS = {
   PRIMARY: '#1DB954',
   HOVER: '#1ed760',
@@ -310,20 +311,7 @@ class SpotifyButton {
     buttonContainer.appendChild(controlsContainer);
     controlsContainer.insertAdjacentHTML('beforeend', dragHandle);
 
-    // Add hover effect for controls
-    buttonContainer.addEventListener('mouseenter', () => {
-      settingsContainer.style.opacity = '1';
-      controlsContainer.style.opacity = '1';
-    });
-
-    buttonContainer.addEventListener('mouseleave', () => {
-      settingsContainer.style.opacity = '0';
-      controlsContainer.style.opacity = '0';
-      // Also close settings dropdown when leaving
-      settingsContainer.classList.remove('active');
-    });
-
-    // Create settings dropdown
+    // Create settings dropdown first
     const settingsDropdown = document.createElement('div');
     settingsDropdown.className = 'settings-dropdown';
     settingsDropdown.innerHTML = `
@@ -343,6 +331,33 @@ class SpotifyButton {
       </div>
     `;
     settingsContainer.appendChild(settingsDropdown);
+
+    // Add hover effect for controls
+    buttonContainer.addEventListener('mouseenter', () => {
+      settingsContainer.style.opacity = '1';
+      controlsContainer.style.opacity = '1';
+    });
+
+    buttonContainer.addEventListener('mouseleave', (e) => {
+      // Check if the mouse is moving to the settings dropdown
+      if (settingsDropdown.contains(e.relatedTarget) || settingsContainer.contains(e.relatedTarget)) {
+        return;
+      }
+
+      settingsContainer.style.opacity = '0';
+      controlsContainer.style.opacity = '0';
+      settingsContainer.classList.remove('active');
+    });
+
+    // Add mouseleave event for the settings dropdown
+    settingsDropdown.addEventListener('mouseleave', (e) => {
+      // Only close if not moving back to the button container
+      if (!buttonContainer.contains(e.relatedTarget)) {
+        settingsContainer.style.opacity = '0';
+        controlsContainer.style.opacity = '0';
+        settingsContainer.classList.remove('active');
+      }
+    });
 
     // Add styles for settings
     const style = document.createElement('style');
@@ -383,7 +398,7 @@ class SpotifyButton {
       .settings-dropdown {
         position: absolute;
         left: 0;
-        margin-top: 4px;
+        top: calc(100% - 4px);
         background: #282828;
         border-radius: 8px;
         padding: 4px;
@@ -392,6 +407,16 @@ class SpotifyButton {
         gap: 2px;
         min-width: 180px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      }
+
+      .settings-dropdown::before {
+        content: '';
+        position: absolute;
+        top: -10px;
+        left: 0;
+        right: 0;
+        height: 10px;
+        background: transparent;
       }
 
       .settings-container.active .settings-dropdown {
@@ -504,24 +529,29 @@ class SpotifyButton {
       // Calculate available space
       const dropdownRect = settingsDropdown.getBoundingClientRect();
       const containerRect = settingsContainer.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - containerRect.bottom;
+      const viewportHeight = window.innerHeight;
+      const spaceBelow = viewportHeight - containerRect.bottom;
       const spaceAbove = containerRect.top;
 
       // Reset previous positioning
       settingsDropdown.style.top = '';
       settingsDropdown.style.bottom = '';
-      settingsDropdown.style.marginTop = '';
-      settingsDropdown.style.marginBottom = '';
+      settingsDropdown.style.left = '';
+      settingsDropdown.style.right = '';
 
       // Position dropdown based on available space
       if (spaceBelow < dropdownRect.height && spaceAbove > dropdownRect.height) {
         // Open upwards if there's more space above
         settingsDropdown.style.bottom = '100%';
+        settingsDropdown.style.top = 'auto';
+        settingsDropdown.style.marginTop = '0';
         settingsDropdown.style.marginBottom = '4px';
       } else {
         // Open downwards (default)
         settingsDropdown.style.top = '100%';
+        settingsDropdown.style.bottom = 'auto';
         settingsDropdown.style.marginTop = '4px';
+        settingsDropdown.style.marginBottom = '0';
       }
 
       // Reset visibility and toggle active state
@@ -572,6 +602,35 @@ class SpotifyButton {
 
       settingsContainer.classList.remove('active');
     });
+
+    // Update styles for dropdown
+    style.textContent = `
+      ${style.textContent}
+      .settings-dropdown::before {
+        content: '';
+        position: absolute;
+        height: 10px;
+        left: 0;
+        right: 0;
+        background: transparent;
+      }
+
+      .settings-container.active .settings-dropdown[style*="bottom: 100%"] {
+        padding-bottom: 8px;
+      }
+
+      .settings-container.active .settings-dropdown[style*="bottom: 100%"]::before {
+        bottom: -10px;
+      }
+
+      .settings-container.active .settings-dropdown[style*="top: 100%"] {
+        padding-top: 8px;
+      }
+
+      .settings-container.active .settings-dropdown[style*="top: 100%"]::before {
+        top: -10px;
+      }
+    `;
   }
 
   setupDragListeners(container) {
@@ -794,30 +853,40 @@ class SpotifyButton {
     `;
 
     this.element.innerHTML = showText ? `${spotifyIcon}Add to Spotify` : spotifyIcon;
-    this.element.className = showText ? '' : 'icon-only';
-
-    // Update padding based on button state
-    this.element.style.padding = showText ? '8px 16px' : '6px';
+    this.element.className = showText ? 'with-text' : 'icon-only';
+    this.element.style.padding = showText ? '8px 16px' : '8px';
+    this.element.style.minWidth = showText ? 'auto' : '32px';
+    this.element.style.width = showText ? 'auto' : '32px';
+    this.element.style.height = showText ? 'auto' : '32px';
+    this.element.style.borderRadius = showText ? '20px' : '50%';
   }
 
   async handleSuccess(trackInfo) {
     const storage = await chrome.storage.local.get('spotify_button_style');
     const showText = storage.spotify_button_style !== 'icon_only';
-    const spotifyIcon = this.element.querySelector('svg').outerHTML;
+    const spotifyIcon = `
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: ${showText ? '8px' : '0'}">
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
+      </svg>
+    `;
 
+    // Hemen buton durumunu güncelle
+    if (showText) {
+      this.element.innerHTML = `${spotifyIcon}✓ Added`;
+      this.element.style.backgroundColor = SPOTIFY_COLORS.BLUE;
+    }
+
+    // Toast mesajını göster
     await this.toast.show(
       `✓ Added "${trackInfo.artist} - ${trackInfo.name}" (${trackInfo.confidence}% match)`,
       { type: 'success' }
     );
 
-    // Update button temporarily
-    this.element.innerHTML = showText ? `${spotifyIcon}✓ Added` : spotifyIcon;
-    this.element.style.backgroundColor = SPOTIFY_COLORS.BLUE;
-
-    // Reset button after delay
-    await delay(TOAST_DISPLAY_DURATION);
-    this.updateButtonStyle(showText);
-    this.element.style.backgroundColor = SPOTIFY_COLORS.PRIMARY;
+    // Butonu eski haline getir
+    setTimeout(() => {
+      this.updateButtonStyle(showText);
+      this.element.style.backgroundColor = SPOTIFY_COLORS.PRIMARY;
+    }, BUTTON_RESET_DURATION);
   }
 
   setupResizeHandler(container) {
