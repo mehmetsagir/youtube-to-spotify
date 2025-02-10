@@ -205,18 +205,33 @@ class SpotifyButton {
   }
 
   async create() {
+    console.log('SpotifyButton create method called');
     // Check if button already exists
     if (document.getElementById('spotify-button-container')) {
+      console.log('Button container already exists, returning');
       return;
     }
 
-    if (document.getElementById('add-to-spotify-btn')) return;
+    if (document.getElementById('add-to-spotify-btn')) {
+      console.log('Button already exists, returning');
+      return;
+    }
 
+    console.log('Creating new button...');
     const spotifyIcon = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: 0">
       <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
     </svg>
   `;
+
+    const settingsIcon = `
+      <div class="settings-handle" title="Settings">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"></circle>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+      </div>
+    `;
 
     const dragHandle = `
       <div class="drag-handle" title="Drag to move button">
@@ -232,41 +247,219 @@ class SpotifyButton {
           <circle cx="7" cy="17" r="1" fill="currentColor"/>
         </svg>
       </div>
-      <div class="reset-handle" title="Reset position">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-          <path d="M3 3v5h5"/>
-        </svg>
-      </div>
-      <div class="toggle-handle" title="Toggle button style">
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-          <line x1="9" y1="3" x2="9" y2="21"/>
-        </svg>
-      </div>
     `;
 
     const buttonContainer = document.createElement('div');
     buttonContainer.id = 'spotify-button-container';
     buttonContainer.style.cssText = `
-    position: fixed;
+      position: fixed;
       z-index: 9999999;
       display: flex;
       align-items: center;
       gap: 8px;
+      visibility: visible !important;
+      opacity: 1 !important;
+    `;
+
+    const controlsContainer = document.createElement('div');
+    controlsContainer.className = 'controls-container';
+    controlsContainer.style.cssText = `
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+    `;
+
+    const settingsContainer = document.createElement('div');
+    settingsContainer.className = 'settings-container';
+    settingsContainer.innerHTML = settingsIcon;
+    settingsContainer.style.cssText = `
+      opacity: 0;
+      transition: opacity 0.2s ease;
     `;
 
     this.element = document.createElement('button');
     this.element.id = 'add-to-spotify-btn';
     this.element.innerHTML = spotifyIcon;
+    this.element.style.cssText = `
+      display: flex !important;
+      align-items: center;
+      justify-content: center;
+      background-color: ${SPOTIFY_COLORS.PRIMARY};
+      color: white;
+      border: none;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      font-size: 14px;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      visibility: visible !important;
+      opacity: 1 !important;
+    `;
 
     // Load button style preference
     const storage = await chrome.storage.local.get('spotify_button_style');
     const showText = storage.spotify_button_style !== 'icon_only';
     this.updateButtonStyle(showText);
 
+    buttonContainer.appendChild(settingsContainer);
     buttonContainer.appendChild(this.element);
-    buttonContainer.insertAdjacentHTML('beforeend', dragHandle);
+    buttonContainer.appendChild(controlsContainer);
+    controlsContainer.insertAdjacentHTML('beforeend', dragHandle);
+
+    // Add hover effect for controls
+    buttonContainer.addEventListener('mouseenter', () => {
+      settingsContainer.style.opacity = '1';
+      controlsContainer.style.opacity = '1';
+    });
+
+    buttonContainer.addEventListener('mouseleave', () => {
+      settingsContainer.style.opacity = '0';
+      controlsContainer.style.opacity = '0';
+      // Also close settings dropdown when leaving
+      settingsContainer.classList.remove('active');
+    });
+
+    // Create settings dropdown
+    const settingsDropdown = document.createElement('div');
+    settingsDropdown.className = 'settings-dropdown';
+    settingsDropdown.innerHTML = `
+      <div class="settings-item" id="toggle-button-style">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+          <line x1="9" y1="3" x2="9" y2="21"/>
+        </svg>
+        <span>Toggle Button Style</span>
+      </div>
+      <div class="settings-item" id="reset-position">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        <span>Reset Position</span>
+      </div>
+    `;
+    settingsContainer.appendChild(settingsDropdown);
+
+    // Add styles for settings
+    const style = document.createElement('style');
+    style.textContent = `
+      .settings-container {
+        position: relative;
+      }
+
+      .settings-handle {
+        width: 28px;
+        height: 28px;
+        background: rgba(128, 128, 128, 0.15);
+        border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .settings-handle:hover {
+        background: rgba(128, 128, 128, 0.25);
+      }
+
+      .settings-handle svg {
+        width: 16px;
+        height: 16px;
+        color: rgba(255, 255, 255, 0.8);
+        opacity: 0.8;
+        transition: all 0.2s ease;
+      }
+
+      .settings-handle:hover svg {
+        opacity: 1;
+        color: rgba(255, 255, 255, 1);
+      }
+
+      .settings-dropdown {
+        position: absolute;
+        left: 0;
+        margin-top: 4px;
+        background: #282828;
+        border-radius: 8px;
+        padding: 4px;
+        display: none;
+        flex-direction: column;
+        gap: 2px;
+        min-width: 180px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+      }
+
+      .settings-container.active .settings-dropdown {
+        display: flex;
+      }
+
+      .settings-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        color: white;
+      }
+
+      .settings-item:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+
+      .settings-item svg {
+        width: 16px;
+        height: 16px;
+        opacity: 0.8;
+      }
+
+      .settings-item:hover svg {
+        opacity: 1;
+      }
+
+      .settings-item span {
+        font-size: 13px;
+      }
+
+      .drag-handle {
+        width: 28px;
+        height: 28px;
+        background: rgba(128, 128, 128, 0.15);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: grab;
+        transition: all 0.2s ease;
+      }
+
+      .drag-handle:hover {
+        background: rgba(128, 128, 128, 0.25);
+      }
+
+      .drag-handle:active {
+        cursor: grabbing;
+        background: rgba(128, 128, 128, 0.35);
+      }
+
+      .drag-handle svg {
+        width: 16px;
+        height: 16px;
+        color: rgba(255, 255, 255, 0.8);
+        opacity: 0.8;
+      }
+
+      .drag-handle:hover svg {
+        opacity: 1;
+      }
+    `;
+    document.head.appendChild(style);
 
     // Load saved position
     const position = await this.loadPosition();
@@ -281,8 +474,6 @@ class SpotifyButton {
       this.yOffset = position.y;
     }
 
-    this.setupStyles();
-    this.setupEventListeners();
     this.setupDragListeners(buttonContainer);
     document.body.appendChild(buttonContainer);
     this.setupFullscreenHandlers();
@@ -296,143 +487,58 @@ class SpotifyButton {
     this.setTranslate(this.xOffset, this.yOffset, buttonContainer);
 
     this.toast = new Toast(this.element);
-  }
 
-  setupStyles() {
-    this.element.style.cssText = `
-      background-color: ${SPOTIFY_COLORS.PRIMARY};
-    color: white;
-    border: none;
-    border-radius: 24px;
-      height: 36px;
-    cursor: pointer;
-    font-weight: 600;
-    font-size: 14px;
-    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-      transition: background-color 0.3s ease, box-shadow 0.3s ease;
-      user-select: none;
-      -webkit-user-select: none;
-      -webkit-touch-callout: none;
-    letter-spacing: 0.3px;
-    text-shadow: 0 1px 2px rgba(0,0,0,0.1);
-      will-change: transform;
-      pointer-events: auto;
-      opacity: 1;
-      visibility: visible;
-    `;
+    // Settings dropdown functionality
+    const settingsHandle = settingsContainer.querySelector('.settings-handle');
+    const toggleButtonStyle = settingsDropdown.querySelector('#toggle-button-style');
+    const resetPosition = settingsDropdown.querySelector('#reset-position');
 
-    // Add styles for drag handle
-    const style = document.createElement('style');
-    style.textContent = `
-      .drag-handle {
-        width: 28px;
-        height: 28px;
-        background: rgba(128, 128, 128, 0.15);
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: grab;
-        opacity: 0;
-        transition: all 0.2s ease;
+    settingsHandle.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      // First, make dropdown temporarily visible but hidden to calculate dimensions
+      settingsDropdown.style.display = 'flex';
+      settingsDropdown.style.visibility = 'hidden';
+
+      // Calculate available space
+      const dropdownRect = settingsDropdown.getBoundingClientRect();
+      const containerRect = settingsContainer.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - containerRect.bottom;
+      const spaceAbove = containerRect.top;
+
+      // Reset previous positioning
+      settingsDropdown.style.top = '';
+      settingsDropdown.style.bottom = '';
+      settingsDropdown.style.marginTop = '';
+      settingsDropdown.style.marginBottom = '';
+
+      // Position dropdown based on available space
+      if (spaceBelow < dropdownRect.height && spaceAbove > dropdownRect.height) {
+        // Open upwards if there's more space above
+        settingsDropdown.style.bottom = '100%';
+        settingsDropdown.style.marginBottom = '4px';
+      } else {
+        // Open downwards (default)
+        settingsDropdown.style.top = '100%';
+        settingsDropdown.style.marginTop = '4px';
       }
 
-      .drag-handle:hover {
-        background: rgba(128, 128, 128, 0.25);
-      }
+      // Reset visibility and toggle active state
+      settingsDropdown.style.visibility = '';
+      settingsDropdown.style.display = '';
+      settingsContainer.classList.toggle('active');
+    });
 
-      .drag-handle:active {
-        cursor: grabbing;
-        background: rgba(128, 128, 128, 0.35);
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+      if (!settingsContainer.contains(e.target)) {
+        settingsContainer.classList.remove('active');
       }
-
-      .reset-handle,
-      .toggle-handle {
-        width: 28px;
-        height: 28px;
-        background: rgba(128, 128, 128, 0.15);
-        border-radius: 6px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        cursor: pointer;
-        opacity: 0;
-        transition: all 0.2s ease;
-        margin-left: 4px;
-      }
-
-      .reset-handle:hover,
-      .toggle-handle:hover {
-        background: rgba(128, 128, 128, 0.25);
-      }
-
-      .reset-handle:active,
-      .toggle-handle:active {
-        background: rgba(128, 128, 128, 0.35);
-      }
-
-      #spotify-button-container:hover .drag-handle,
-      #spotify-button-container:hover .reset-handle,
-      #spotify-button-container:hover .toggle-handle {
-        opacity: 1;
-      }
-
-      .drag-handle svg,
-      .reset-handle svg,
-      .toggle-handle svg {
-        width: 16px;
-        height: 16px;
-        color: rgba(255, 255, 255, 0.8);
-        opacity: 0.8;
-      }
-
-      .drag-handle:hover svg,
-      .reset-handle:hover svg,
-      .toggle-handle:hover svg {
-        opacity: 1;
-      }
-
-      #add-to-spotify-btn {
-        transition: all 0.3s ease;
-        border-radius: 24px;
-        height: 36px;
-        width: auto;
-      }
-
-      #add-to-spotify-btn.icon-only {
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-
-      #add-to-spotify-btn.icon-only svg {
-        margin-right: 0;
-        width: 16px;
-        height: 16px;
-      }
-
-      #add-to-spotify-btn svg {
-        transition: all 0.3s ease;
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  setupDragListeners(container) {
-    const dragHandle = container.querySelector('.drag-handle');
-    const resetHandle = container.querySelector('.reset-handle');
-    const toggleHandle = container.querySelector('.toggle-handle');
-    let isDragging = false;
+    });
 
     // Toggle button style handler
-    toggleHandle.addEventListener('click', async (e) => {
+    toggleButtonStyle.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
 
@@ -440,10 +546,11 @@ class SpotifyButton {
       const showText = storage.spotify_button_style === 'icon_only';
       await chrome.storage.local.set({ 'spotify_button_style': showText ? 'with_text' : 'icon_only' });
       this.updateButtonStyle(showText);
+      settingsContainer.classList.remove('active');
     });
 
-    // Reset button click handler
-    resetHandle.addEventListener('click', async (e) => {
+    // Reset position handler
+    resetPosition.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
 
@@ -452,17 +559,24 @@ class SpotifyButton {
       this.yOffset = window.innerHeight - 100; // 100px from bottom
 
       // Apply position with animation
-      container.style.transition = 'transform 0.3s ease';
-      this.setTranslate(this.xOffset, this.yOffset, container);
+      buttonContainer.style.transition = 'transform 0.3s ease';
+      this.setTranslate(this.xOffset, this.yOffset, buttonContainer);
 
       // Save the position
       await this.savePosition(this.xOffset, this.yOffset);
 
       // Reset transition after animation
       setTimeout(() => {
-        container.style.transition = '';
+        buttonContainer.style.transition = '';
       }, 300);
+
+      settingsContainer.classList.remove('active');
     });
+  }
+
+  setupDragListeners(container) {
+    const dragHandle = container.querySelector('.drag-handle');
+    let isDragging = false;
 
     const handleDragStart = (e) => {
       if (e.type === 'mousedown' && e.button !== 0) return; // Only left click
@@ -1001,20 +1115,30 @@ function removeExistingButton() {
 }
 
 function createOrUpdateButton() {
-  if (isProcessingMutation) return;
-
-  removeExistingButton();
+  console.log('createOrUpdateButton called');
+  if (isProcessingMutation) {
+    console.log('Processing mutation, skipping button creation');
+    return;
+  }
 
   if (!isButtonInitialized) {
+    console.log('Button not initialized, creating new button');
     isButtonInitialized = true;
     const spotifyButton = new SpotifyButton();
-    const container = document.createElement('div');
-    container.spotifyButton = spotifyButton; // Store button instance for cleanup
-    spotifyButton.create();
+    spotifyButton.create().then(() => {
+      console.log('Button created successfully');
+      spotifyButton.setupEventListeners();
+    }).catch(error => {
+      console.error('Error creating button:', error);
+      isButtonInitialized = false;
+    });
+  } else {
+    console.log('Button already initialized');
   }
 }
 
 function setupNavigationObserver() {
+  console.log('Setting up navigation observer');
   // If there's an existing observer, disconnect it
   if (navigationObserver) {
     navigationObserver.disconnect();
@@ -1023,10 +1147,14 @@ function setupNavigationObserver() {
   // Create new observer for the main app container
   navigationObserver = new MutationObserver((mutations) => {
     // If already processing or button is being dragged, skip
-    if (isProcessingMutation) return;
+    if (isProcessingMutation) {
+      console.log('Already processing mutation, skipping');
+      return;
+    }
 
     // Check if URL has changed
     if (location.href !== lastUrl) {
+      console.log('URL changed, reinitializing button');
       lastUrl = location.href;
       isButtonInitialized = false;
       checkAndInitializeButton();
@@ -1036,6 +1164,7 @@ function setupNavigationObserver() {
     // Don't check for changes if we're dragging the button
     const container = document.getElementById('spotify-button-container');
     if (container?.getAttribute('data-dragging') === 'true') {
+      console.log('Button is being dragged, skipping');
       return;
     }
 
@@ -1050,6 +1179,7 @@ function setupNavigationObserver() {
           mutation.target.id === 'container' ||
           mutation.target.tagName === 'YTD-WATCH-METADATA' ||
           mutation.target.tagName === 'YTD-WATCH-FLEXY') {
+          console.log('Video content changed, checking button');
           checkAndInitializeButton();
           break;
         }
@@ -1063,21 +1193,27 @@ function setupNavigationObserver() {
   // Start observing
   const appContainer = document.querySelector('ytd-app');
   if (appContainer) {
+    console.log('Found app container, starting observation');
     navigationObserver.observe(appContainer, {
       childList: true,
       subtree: true,
       attributes: true
     });
+  } else {
+    console.log('App container not found');
   }
 }
 
 function checkAndInitializeButton() {
+  console.log('checkAndInitializeButton called');
   // Check if we're on a video page
   if (!window.location.pathname.startsWith('/watch')) {
+    console.log('Not on a video page, removing button');
     removeExistingButton();
     return;
   }
 
+  console.log('On video page, waiting for elements...');
   // Wait for video metadata to load
   waitForElements({
     selectors: [
@@ -1087,9 +1223,12 @@ function checkAndInitializeButton() {
     ],
     timeout: 10000,
     onSuccess: () => {
+      console.log('Elements found, checking if music video');
       if (isMusicVideo()) {
+        console.log('Music video detected, creating button');
         createOrUpdateButton();
       } else {
+        console.log('Not a music video, removing button');
         removeExistingButton();
       }
     },
@@ -1152,34 +1291,41 @@ window.addEventListener('unload', () => {
 
 // Check if the current video is a song
 function isMusicVideo() {
+  console.log('Checking if music video...');
   // First check for music metadata
   const categoryRows = document.querySelectorAll('ytd-metadata-row-renderer');
   let isInMusicCategory = false;
   let hasMusicMetadata = false;
 
+  console.log('Found category rows:', categoryRows.length);
   // Check each metadata row
   categoryRows.forEach(row => {
     const title = row.querySelector('#title')?.textContent?.toLowerCase()?.trim() || '';
     const content = row.querySelector('#content')?.textContent?.toLowerCase()?.trim() || '';
+    console.log('Metadata row:', { title, content });
 
     // Check if video is in Music category
     if (title === 'category' && content === 'music') {
       isInMusicCategory = true;
+      console.log('Music category detected');
     }
 
     // Check for music-specific metadata
     if (['song', 'artist', 'album', 'licensed to youtube by', 'music', 'provided to youtube by'].includes(title)) {
       hasMusicMetadata = true;
+      console.log('Music metadata detected');
     }
   });
 
   // If we found direct music metadata, it's definitely a music video
   if (hasMusicMetadata) {
+    console.log('Has music metadata, returning true');
     return true;
   }
 
   // Check video title for music indicators
   const videoTitle = document.querySelector('h1.style-scope.ytd-watch-metadata')?.textContent?.toLowerCase() || '';
+  console.log('Video title:', videoTitle);
   const titleIndicators = [
     'official music video',
     'official audio',
