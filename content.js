@@ -754,21 +754,234 @@ function addSelectedSong(track) {
   });
 }
 
-// Initialize button when page loads and URL changes
-function init() {
-  const spotifyButton = new SpotifyButton();
-  spotifyButton.create();
-}
-
-// Start on page load
-init();
-
 // Watch for YouTube's dynamic page loads
 let lastUrl = location.href;
-new MutationObserver(() => {
-  const url = location.href;
-  if (url !== lastUrl) {
-    lastUrl = url;
-    init();
+let navigationObserver = null;
+
+function setupNavigationObserver() {
+  // If there's an existing observer, disconnect it
+  if (navigationObserver) {
+    navigationObserver.disconnect();
   }
-}).observe(document, { subtree: true, childList: true }); 
+
+  // Create new observer for the main app container
+  navigationObserver = new MutationObserver((mutations) => {
+    // Check if URL has changed
+    if (location.href !== lastUrl) {
+      lastUrl = location.href;
+      checkAndInitializeButton();
+      return;
+    }
+
+    // Check for video content changes
+    for (const mutation of mutations) {
+      if (mutation.target.id === 'content' ||
+        mutation.target.id === 'info' ||
+        mutation.target.id === 'container' ||
+        mutation.target.tagName === 'YTD-WATCH-METADATA' ||
+        mutation.target.tagName === 'YTD-WATCH-FLEXY') {
+        checkAndInitializeButton();
+        break;
+      }
+    }
+  });
+
+  // Start observing
+  const appContainer = document.querySelector('ytd-app');
+  if (appContainer) {
+    navigationObserver.observe(appContainer, {
+      childList: true,
+      subtree: true,
+      attributes: true
+    });
+  }
+}
+
+function checkAndInitializeButton() {
+  // Check if we're on a video page
+  if (!window.location.pathname.startsWith('/watch')) {
+    removeExistingButton();
+    return;
+  }
+
+  // Wait for video metadata to load
+  waitForElements({
+    selectors: [
+      'ytd-watch-metadata',
+      'h1.style-scope.ytd-watch-metadata',
+      '#description-inline-expander'
+    ],
+    timeout: 10000,
+    onSuccess: () => {
+      if (isMusicVideo()) {
+        createOrUpdateButton();
+      } else {
+        removeExistingButton();
+      }
+    },
+    onTimeout: () => {
+      console.log('Timeout waiting for video metadata');
+      removeExistingButton();
+    }
+  });
+}
+
+function waitForElements({ selectors, timeout, onSuccess, onTimeout }) {
+  const startTime = Date.now();
+
+  function checkElements() {
+    const allElementsExist = selectors.every(selector => {
+      const element = document.querySelector(selector);
+      return element !== null;
+    });
+
+    if (allElementsExist) {
+      onSuccess();
+      return;
+    }
+
+    if (Date.now() - startTime >= timeout) {
+      onTimeout();
+      return;
+    }
+
+    requestAnimationFrame(checkElements);
+  }
+
+  checkElements();
+}
+
+function createOrUpdateButton() {
+  const existingButton = document.getElementById('add-to-spotify-btn');
+  if (!existingButton) {
+    const spotifyButton = new SpotifyButton();
+    spotifyButton.create();
+  }
+}
+
+function removeExistingButton() {
+  const existingButton = document.getElementById('add-to-spotify-btn');
+  if (existingButton) {
+    existingButton.remove();
+  }
+}
+
+// Initialize on page load
+function initialize() {
+  setupNavigationObserver();
+  checkAndInitializeButton();
+}
+
+// Start observing when the page loads
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initialize);
+} else {
+  initialize();
+}
+
+// Re-initialize on navigation
+window.addEventListener('popstate', checkAndInitializeButton);
+window.addEventListener('pushstate', checkAndInitializeButton);
+window.addEventListener('replacestate', checkAndInitializeButton);
+
+// Cleanup on unload
+window.addEventListener('unload', () => {
+  if (navigationObserver) {
+    navigationObserver.disconnect();
+  }
+});
+
+// Check if the current video is a song
+function isMusicVideo() {
+  // First check for music metadata
+  const categoryRows = document.querySelectorAll('ytd-metadata-row-renderer');
+  let isInMusicCategory = false;
+  let hasMusicMetadata = false;
+
+  // Check each metadata row
+  categoryRows.forEach(row => {
+    const title = row.querySelector('#title')?.textContent?.toLowerCase()?.trim() || '';
+    const content = row.querySelector('#content')?.textContent?.toLowerCase()?.trim() || '';
+
+    // Check if video is in Music category
+    if (title === 'category' && content === 'music') {
+      isInMusicCategory = true;
+    }
+
+    // Check for music-specific metadata
+    if (['song', 'artist', 'album', 'licensed to youtube by', 'music', 'provided to youtube'].includes(title)) {
+      hasMusicMetadata = true;
+    }
+  });
+
+  // If we found direct music metadata, it's definitely a music video
+  if (hasMusicMetadata) {
+    return true;
+  }
+
+  // Check video title for music indicators
+  const videoTitle = document.querySelector('h1.style-scope.ytd-watch-metadata')?.textContent?.toLowerCase() || '';
+  const titleIndicators = [
+    'official music video',
+    'official audio',
+    'lyrics',
+    'music video',
+    '(audio)',
+    '[audio]',
+    '(official video)',
+    '[official video]',
+    'ft.',
+    'feat.',
+    'remix',
+    'cover',
+    'official',
+    'resmi',
+    'klip',
+    'clip',
+    'mv',
+    'lyric video',
+    'performance',
+    'live',
+    'acoustic'
+  ];
+
+  if (titleIndicators.some(indicator => videoTitle.includes(indicator))) {
+    return true;
+  }
+
+  // Check description for additional confirmation
+  const description = document.querySelector('#description-inline-expander')?.textContent?.toLowerCase() || '';
+  const musicIndicators = [
+    'official music video',
+    'official audio',
+    'official video',
+    'lyrics',
+    'provided to youtube by',
+    'released on:',
+    'track:',
+    '℗',
+    '©',
+    'listen on spotify',
+    'stream on spotify',
+    'available on spotify',
+    'music video',
+    'audio visualizer',
+    'lyric video',
+    'artist:',
+    'song:',
+    'album:',
+    'genre:',
+    'music video by',
+    'official music video by',
+    'all rights reserved',
+    'auto-generated by youtube',
+    'provided to youtube'
+  ];
+
+  if (musicIndicators.some(indicator => description.includes(indicator))) {
+    return true;
+  }
+
+  // If it's in the Music category, it's likely a music video
+  return isInMusicCategory;
+} 
