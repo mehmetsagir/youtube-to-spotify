@@ -18,24 +18,215 @@ function getSongInfo() {
   const title = document.querySelector('h1.style-scope.ytd-watch-metadata')?.textContent;
   if (!title) return null;
 
-  const separators = [' - ', ' – ', ' — ', ' • ', ' | '];
+  let songInfo = {
+    song: '',
+    artist: '',
+    confidence: 0,
+    sources: [], // Bilginin nereden geldiğini takip etmek için
+    possibleArtists: new Set() // Olası sanatçı isimlerini tekrarsız olarak tutmak için
+  };
 
-  // Try to extract artist and song name using separators
+  // 1. Video meta verilerinden bilgi çıkarma (En güvenilir kaynak)
+  const categoryRows = document.querySelectorAll('ytd-metadata-row-renderer');
+  categoryRows.forEach(row => {
+    const title = row.querySelector('#title')?.textContent?.toLowerCase()?.trim();
+    const content = row.querySelector('#content')?.textContent?.trim();
+
+    if (title && content) {
+      if (title === 'song' && (!songInfo.song || songInfo.confidence < 50)) {
+        songInfo.song = content;
+        songInfo.confidence += 45;
+        songInfo.sources.push('metadata_song');
+      } else if (title === 'artist' && (!songInfo.artist || songInfo.confidence < 50)) {
+        songInfo.artist = content;
+        songInfo.possibleArtists.add(content);
+        songInfo.confidence += 45;
+        songInfo.sources.push('metadata_artist');
+      }
+    }
+  });
+
+  // 2. Başlıktan bilgi çıkarma
+  const separators = [' - ', ' – ', ' — ', ' • ', ' | '];
+  let titleParts = null;
+
+  // Ayraçları kontrol et
   for (const separator of separators) {
     if (title.includes(separator)) {
-      const [artist, songName] = title.split(separator);
-      return {
-        artist: artist.trim(),
-        song: songName.trim()
-      };
+      titleParts = title.split(separator);
+      if (titleParts.length >= 2) {
+        const possibleArtist = titleParts[0].trim();
+        const possibleSong = titleParts[1].trim();
+
+        // Eğer meta verilerden gelen şarkı/sanatçı bilgisi yoksa kullan
+        if (!songInfo.song) {
+          songInfo.song = possibleSong;
+          songInfo.confidence += 30;
+          songInfo.sources.push('title_separator_song');
+        }
+
+        if (!songInfo.artist) {
+          songInfo.artist = possibleArtist;
+          songInfo.possibleArtists.add(possibleArtist);
+          songInfo.confidence += 30;
+          songInfo.sources.push('title_separator_artist');
+        }
+        break;
+      }
     }
   }
 
-  // If no separator found, use the entire title as song name
-  return {
-    song: title.trim(),
-    artist: ''
-  };
+  // Eğer ayraçla ayrılmamışsa ve şarkı adı yoksa, tüm başlığı şarkı adı olarak al
+  if (!titleParts && !songInfo.song) {
+    songInfo.song = title.trim();
+    songInfo.confidence += 10;
+    songInfo.sources.push('title_full');
+  }
+
+  // 3. Açıklama bölümünden bilgi çıkarma
+  const description = document.querySelector('#description-inline-expander')?.textContent;
+  if (description) {
+    const descriptionLower = description.toLowerCase();
+    const patterns = [
+      { regex: /artist\s*[:-]\s*([^\\n]+)/i, type: 'artist' },
+      { regex: /performed by\s*[:-]\s*([^\\n]+)/i, type: 'artist' },
+      { regex: /song\s*[:-]\s*([^\\n]+)/i, type: 'song' },
+      { regex: /track\s*[:-]\s*([^\\n]+)/i, type: 'song' },
+      { regex: /title\s*[:-]\s*([^\\n]+)/i, type: 'song' },
+      { regex: /music\s*by\s*[:-]\s*([^\\n]+)/i, type: 'artist' }
+    ];
+
+    patterns.forEach(pattern => {
+      const match = descriptionLower.match(pattern.regex);
+      if (match && match[1]) {
+        const value = match[1].trim();
+        if (pattern.type === 'artist') {
+          songInfo.possibleArtists.add(value);
+          if (!songInfo.artist || songInfo.confidence < 40) {
+            songInfo.artist = value;
+            songInfo.confidence += 35;
+            songInfo.sources.push('description_artist');
+          }
+        } else if (pattern.type === 'song' && (!songInfo.song || songInfo.confidence < 40)) {
+          songInfo.song = value;
+          songInfo.confidence += 25;
+          songInfo.sources.push('description_song');
+        }
+      }
+    });
+  }
+
+  // 4. Kanal adından sanatçı bilgisi (En son başvurulacak kaynak)
+  const channelName = document.querySelector('#channel-name')?.textContent?.trim();
+  if (channelName && (!songInfo.artist || songInfo.confidence < 30)) {
+    // VEVO kontrolü
+    if (channelName.toLowerCase().includes('vevo')) {
+      const artistName = channelName.replace(/VEVO/i, '').trim();
+      if (artistName && !songInfo.possibleArtists.has(artistName)) {
+        songInfo.artist = artistName;
+        songInfo.possibleArtists.add(artistName);
+        songInfo.confidence += 40;
+        songInfo.sources.push('channel_vevo');
+      }
+    } else {
+      // Diğer resmi kanal kontrolleri
+      const officialIndicators = ['official', 'resmi', 'music', 'müzik'];
+      if (officialIndicators.some(indicator => channelName.toLowerCase().includes(indicator))) {
+        let cleanChannelName = channelName;
+        officialIndicators.forEach(indicator => {
+          cleanChannelName = cleanChannelName.replace(new RegExp(indicator, 'gi'), '');
+        });
+        cleanChannelName = cleanChannelName.replace(/\s*-\s*|\s*\|\s*|\s*•\s*/g, '').trim();
+
+        if (cleanChannelName && !songInfo.possibleArtists.has(cleanChannelName)) {
+          songInfo.artist = cleanChannelName;
+          songInfo.possibleArtists.add(cleanChannelName);
+          songInfo.confidence += 30;
+          songInfo.sources.push('channel_official');
+        }
+      }
+    }
+  }
+
+  // 5. Başlıktan gereksiz bilgileri temizle
+  const cleanupPatterns = [
+    /\(Official\s*([^)]*)\)/gi,
+    /\[Official\s*([^]]*)\]/gi,
+    /\(Lyrics\s*([^)]*)\)/gi,
+    /\[Lyrics\s*([^]]*)\]/gi,
+    /\(Audio\s*([^)]*)\)/gi,
+    /\[Audio\s*([^]]*)\]/gi,
+    /\(Official Music Video\)/gi,
+    /\[Official Music Video\]/gi,
+    /\(Lyric Video\)/gi,
+    /\[Lyric Video\]/gi,
+    /\(Official Video\)/gi,
+    /\[Official Video\]/gi,
+    /\(Music Video\)/gi,
+    /\[Music Video\]/gi,
+    /\(Performance Video\)/gi,
+    /\[Performance Video\]/gi,
+    /\(Live\s*([^)]*)\)/gi,
+    /\[Live\s*([^]]*)\]/gi,
+    /\(Cover\s*([^)]*)\)/gi,
+    /\[Cover\s*([^]]*)\]/gi
+  ];
+
+  if (songInfo.song) {
+    let cleanSong = songInfo.song;
+    cleanupPatterns.forEach(pattern => {
+      cleanSong = cleanSong.replace(pattern, '').trim();
+    });
+    songInfo.song = cleanSong;
+  }
+
+  // 6. Güven skorunu kontrol et ve sanatçı adının tekrarlanmasını önle
+  if (songInfo.confidence < 20 || !songInfo.song) {
+    return null;
+  }
+
+  // Sanatçı adının şarkı adında tekrarlanmasını kontrol et
+  if (songInfo.artist) {
+    // Sanatçı adındaki tekrarları temizle
+    const artistParts = songInfo.artist.split(/\s+/);
+    const uniqueArtistParts = [...new Set(artistParts)];
+    songInfo.artist = uniqueArtistParts.join(' ');
+
+    // "Kanal", "Channel", "Official" gibi gereksiz kelimeleri temizle
+    const unwantedWords = [
+      'kanal', 'channel', 'official', 'resmi', 'music', 'müzik', 'tv',
+      'sanatçı', 'sanatci', 'artist', 'records', 'record', 'media',
+      'production', 'productions', 'entertainment', 'official channel',
+      'resmi kanal', 'muzik', 'music channel', 'müzik kanalı'
+    ];
+
+    // Önce tam eşleşmeleri kontrol et
+    const fullPhrases = unwantedWords.filter(word => songInfo.artist.toLowerCase().includes(word));
+    fullPhrases.forEach(phrase => {
+      songInfo.artist = songInfo.artist.replace(new RegExp(phrase, 'gi'), '');
+    });
+
+    // Sonra kelime bazlı temizlik yap
+    songInfo.artist = songInfo.artist
+      .split(/\s+/)
+      .filter(word => !unwantedWords.includes(word.toLowerCase()))
+      .join(' ');
+
+    // Gereksiz boşlukları ve noktalama işaretlerini temizle
+    songInfo.artist = songInfo.artist.replace(/^\W+|\W+$/g, '').trim();
+
+    // Sanatçı adının şarkı adında tekrarlanmasını kontrol et
+    songInfo.song = songInfo.song.replace(new RegExp(songInfo.artist, 'gi'), '').trim();
+  }
+
+  // Gereksiz boşlukları ve noktalama işaretlerini temizle
+  songInfo.song = songInfo.song.replace(/^\W+|\W+$/g, '').trim();
+  if (songInfo.artist) {
+    songInfo.artist = songInfo.artist.replace(/^\W+|\W+$/g, '').trim();
+  }
+
+  console.log('Extracted song info:', songInfo);
+  return songInfo;
 }
 
 // UI Components
@@ -229,7 +420,7 @@ class SpotifyButton {
       <div class="settings-handle" title="Settings">
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="3"></circle>
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
       </div>
     `;
@@ -779,30 +970,27 @@ class SpotifyButton {
   }
 
   async handleClick() {
-    // First check if connected to Spotify
     try {
       const storage = await chrome.storage.local.get(['spotify_token', 'client_id']);
 
       if (!storage.spotify_token || !storage.client_id) {
-        // Not connected, open popup
         chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
         this.toast.create().show('Please connect your Spotify account first', { type: 'info' });
         return;
       }
 
-      // Check if token is valid
+      // Token kontrolü
       const response = await fetch('https://api.spotify.com/v1/me', {
         headers: { 'Authorization': `Bearer ${storage.spotify_token}` }
       });
 
       if (!response.ok) {
-        // Token invalid, open popup
         chrome.runtime.sendMessage({ type: 'OPEN_POPUP' });
         this.toast.create().show('Spotify connection expired. Please reconnect.', { type: 'info' });
         return;
       }
 
-      // If we're here, we're connected. Proceed with normal flow
+      // Şarkı bilgilerini al
       const songInfo = getSongInfo();
       if (!songInfo) {
         this.toast.create().show('Could not detect song information!', { type: 'error' });
@@ -814,26 +1002,47 @@ class SpotifyButton {
 
       // Show progress
       this.toast.create();
-      await this.toast.show(`Searching for "${songInfo.artist} - ${songInfo.song}"...`, { type: 'loading', duration: 0 });
+      await this.toast.show(`Searching for "${songInfo.artist ? songInfo.artist + ' - ' : ''}${songInfo.song}"...`, { type: 'loading', duration: 0 });
 
-      // Send song info to background script
-      chrome.runtime.sendMessage({ type: 'ADD_TO_SPOTIFY', data: songInfo }, async response => {
+      // Spotify'da ara
+      chrome.runtime.sendMessage({
+        type: 'ADD_TO_SPOTIFY',
+        data: {
+          song: songInfo.song,
+          artist: songInfo.artist,
+          confidence: songInfo.confidence,
+          sources: songInfo.sources
+        }
+      }, async response => {
         this.setLoading(false);
 
         if (response?.success) {
-          // Direct match found and added
+          // Tam eşleşme bulundu ve eklendi
           await this.handleSuccess(response.trackInfo);
         } else if (response?.searchResults?.length > 0) {
-          // Multiple matches found
+          // Birden fazla eşleşme bulundu
           await this.toast.hide();
-          createSongSelectionModal(response.searchResults);
+
+          // Güven skoru düşükse veya sanatçı bilgisi eksikse her zaman seçim yaptır
+          if (!songInfo.artist || songInfo.confidence < 70 || response.searchResults.length > 1) {
+            createSongSelectionModal(response.searchResults, songInfo);
+          } else {
+            // En iyi eşleşmeyi seç
+            const bestMatch = response.searchResults[0];
+            if (bestMatch.confidence > 80) {
+              await this.handleSuccess(bestMatch);
+            } else {
+              createSongSelectionModal(response.searchResults, songInfo);
+            }
+          }
         } else {
-          // Error or no matches
+          // Hata veya eşleşme bulunamadı
           const errorMessage = response?.error || 'No matching songs found on Spotify';
           await this.toast.show(`Error: ${errorMessage}`, { type: 'error' });
         }
       });
     } catch (error) {
+      this.setLoading(false);
       this.toast.create().show('An error occurred. Please try again.', { type: 'error' });
       console.error('Error in handleClick:', error);
     }
@@ -866,7 +1075,7 @@ class SpotifyButton {
     const showText = storage.spotify_button_style !== 'icon_only';
     const spotifyIcon = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: ${showText ? '8px' : '0'}">
-        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
       </svg>
     `;
 
@@ -941,7 +1150,7 @@ class SpotifyButton {
 }
 
 // Create song selection modal
-function createSongSelectionModal(searchResults) {
+function createSongSelectionModal(searchResults, songInfo) {
   // Create modal container
   const modal = document.createElement('div');
   modal.id = 'spotify-song-modal';
@@ -1031,8 +1240,8 @@ function createSongSelectionModal(searchResults) {
     `;
 
     // Add song info
-    const songInfo = document.createElement('div');
-    songInfo.style.cssText = `
+    const songInfoDiv = document.createElement('div');
+    songInfoDiv.style.cssText = `
       flex: 1;
       min-width: 0;
     `;
@@ -1067,10 +1276,10 @@ function createSongSelectionModal(searchResults) {
       white-space: nowrap;
     `;
 
-    songInfo.appendChild(songName);
-    songInfo.appendChild(artistAlbum);
+    songInfoDiv.appendChild(songName);
+    songInfoDiv.appendChild(artistAlbum);
     songItem.appendChild(icon);
-    songItem.appendChild(songInfo);
+    songItem.appendChild(songInfoDiv);
     songItem.appendChild(confidence);
 
     // Add hover effects
@@ -1086,7 +1295,7 @@ function createSongSelectionModal(searchResults) {
     songItem.addEventListener('click', () => {
       document.body.removeChild(modal);
       document.body.removeChild(overlay);
-      addSelectedSong(track);
+      addSelectedSong(track, songInfo);
     });
 
     songList.appendChild(songItem);
@@ -1133,12 +1342,12 @@ function createSongSelectionModal(searchResults) {
 }
 
 // Function to add selected song
-function addSelectedSong(track) {
+function addSelectedSong(track, songInfo) {
   const button = document.getElementById('add-to-spotify-btn');
   const toast = new Toast(button);
   toast.create();
 
-  toast.show(`Adding "${track.artist} - ${track.name}"...`, { type: 'loading', duration: 0 });
+  toast.show(`Adding "${track.artist ? track.artist + ' - ' : ''}${track.name}"...`, { type: 'loading', duration: 0 });
 
   // Send selected track to background script
   chrome.runtime.sendMessage({
@@ -1148,7 +1357,7 @@ function addSelectedSong(track) {
     if (response?.success) {
       // Success state
       const spotifyIcon = button.querySelector('svg').outerHTML;
-      await toast.show(`✓ Added "${track.artist} - ${track.name}"`, { type: 'success' });
+      await toast.show(`✓ Added "${track.artist ? track.artist + ' - ' : ''}${track.name}"`, { type: 'success' });
 
       button.innerHTML = `${spotifyIcon}✓ Added`;
       button.style.backgroundColor = SPOTIFY_COLORS.BLUE;
@@ -1164,356 +1373,33 @@ function addSelectedSong(track) {
   });
 }
 
-// Watch for YouTube's dynamic page loads
-let lastUrl = location.href;
-let navigationObserver = null;
+// Initialize SpotifyButton when the page loads
+let spotifyButton = null;
 
-let isButtonInitialized = false;
-let isProcessingMutation = false;
+async function initializeButton() {
+  // Clean up existing button if any
+  if (spotifyButton) {
+    spotifyButton.cleanup();
+  }
 
-function removeExistingButton() {
-  const containers = document.querySelectorAll('#spotify-button-container');
-  containers.forEach(container => {
-    const spotifyButton = container.spotifyButton;
-    if (spotifyButton) {
-      spotifyButton.cleanup();
-    }
-    container.remove();
-  });
-  isButtonInitialized = false;
+  // Create new button
+  spotifyButton = new SpotifyButton();
+  await spotifyButton.create();
+  spotifyButton.setupEventListeners();
 }
 
-function createOrUpdateButton() {
-  console.log('createOrUpdateButton called');
-  if (isProcessingMutation) {
-    console.log('Processing mutation, skipping button creation');
-    return;
-  }
-
-  if (!isButtonInitialized) {
-    console.log('Button not initialized, creating new button');
-    isButtonInitialized = true;
-    const spotifyButton = new SpotifyButton();
-    spotifyButton.create().then(() => {
-      console.log('Button created successfully');
-      spotifyButton.setupEventListeners();
-    }).catch(error => {
-      console.error('Error creating button:', error);
-      isButtonInitialized = false;
-    });
-  } else {
-    console.log('Button already initialized');
-  }
-}
-
-function setupNavigationObserver() {
-  console.log('Setting up navigation observer');
-  // If there's an existing observer, disconnect it
-  if (navigationObserver) {
-    navigationObserver.disconnect();
-  }
-
-  // Create new observer for the main app container
-  navigationObserver = new MutationObserver((mutations) => {
-    // If already processing or button is being dragged, skip
-    if (isProcessingMutation) {
-      console.log('Already processing mutation, skipping');
-      return;
-    }
-
-    // Check if URL has changed
-    if (location.href !== lastUrl) {
-      console.log('URL changed, reinitializing button');
-      lastUrl = location.href;
-      isButtonInitialized = false;
-      checkAndInitializeButton();
-      return;
-    }
-
-    // Don't check for changes if we're dragging the button
-    const container = document.getElementById('spotify-button-container');
-    if (container?.getAttribute('data-dragging') === 'true') {
-      console.log('Button is being dragged, skipping');
-      return;
-    }
-
-    // Set processing flag
-    isProcessingMutation = true;
-
-    try {
-      // Check for video content changes
-      for (const mutation of mutations) {
-        if (mutation.target.id === 'content' ||
-          mutation.target.id === 'info' ||
-          mutation.target.id === 'container' ||
-          mutation.target.tagName === 'YTD-WATCH-METADATA' ||
-          mutation.target.tagName === 'YTD-WATCH-FLEXY') {
-          console.log('Video content changed, checking button');
-          checkAndInitializeButton();
-          break;
-        }
-      }
-    } finally {
-      // Reset processing flag
-      isProcessingMutation = false;
-    }
-  });
-
-  // Start observing
-  const appContainer = document.querySelector('ytd-app');
-  if (appContainer) {
-    console.log('Found app container, starting observation');
-    navigationObserver.observe(appContainer, {
-      childList: true,
-      subtree: true,
-      attributes: true
-    });
-  } else {
-    console.log('App container not found');
-  }
-}
-
-function checkAndInitializeButton() {
-  console.log('checkAndInitializeButton called');
-  // Check if we're on a video page
-  if (!window.location.pathname.startsWith('/watch')) {
-    console.log('Not on a video page, removing button');
-    removeExistingButton();
-    return;
-  }
-
-  console.log('On video page, waiting for elements...');
-  // Wait for video metadata to load
-  waitForElements({
-    selectors: [
-      'ytd-watch-metadata',
-      'h1.style-scope.ytd-watch-metadata',
-      '#description-inline-expander'
-    ],
-    timeout: 10000,
-    onSuccess: () => {
-      console.log('Elements found, checking if music video');
-      if (isMusicVideo()) {
-        console.log('Music video detected, creating button');
-        createOrUpdateButton();
-      } else {
-        console.log('Not a music video, removing button');
-        removeExistingButton();
-      }
-    },
-    onTimeout: () => {
-      console.log('Timeout waiting for video metadata');
-      removeExistingButton();
-    }
-  });
-}
-
-function waitForElements({ selectors, timeout, onSuccess, onTimeout }) {
-  const startTime = Date.now();
-
-  function checkElements() {
-    const allElementsExist = selectors.every(selector => {
-      const element = document.querySelector(selector);
-      return element !== null;
-    });
-
-    if (allElementsExist) {
-      onSuccess();
-      return;
-    }
-
-    if (Date.now() - startTime >= timeout) {
-      onTimeout();
-      return;
-    }
-
-    requestAnimationFrame(checkElements);
-  }
-
-  checkElements();
-}
-
-// Initialize on page load
-function initialize() {
-  setupNavigationObserver();
-  checkAndInitializeButton();
-}
-
-// Start observing when the page loads
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initialize);
-} else {
-  initialize();
-}
-
-// Re-initialize on navigation
-window.addEventListener('popstate', checkAndInitializeButton);
-window.addEventListener('pushstate', checkAndInitializeButton);
-window.addEventListener('replacestate', checkAndInitializeButton);
-
-// Cleanup on unload
-window.addEventListener('unload', () => {
-  if (navigationObserver) {
-    navigationObserver.disconnect();
-  }
-});
-
-// Check if the current video is a song
-function isMusicVideo() {
-  console.log('Checking if music video...');
-  let score = 0;
-  const THRESHOLD = 2; // En az 2 puan alan videolar müzik olarak kabul edilecek
-
-  // 1. Kategori Kontrolü
-  const categoryRows = document.querySelectorAll('ytd-metadata-row-renderer');
-  let isInMusicCategory = false;
-  let hasMusicMetadata = false;
-
-  console.log('Found category rows:', categoryRows.length);
-  categoryRows.forEach(row => {
-    const title = row.querySelector('#title')?.textContent?.toLowerCase()?.trim() || '';
-    const content = row.querySelector('#content')?.textContent?.toLowerCase()?.trim() || '';
-    console.log('Metadata row:', { title, content });
-
-    // Müzik kategorisinde mi?
-    if (title === 'category' && content === 'music') {
-      isInMusicCategory = true;
-      score += 2;
-      console.log('Music category detected (+2 points)');
-    }
-
-    // Müzik metadatası var mı?
-    if (['song', 'artist', 'album', 'licensed to youtube by', 'music', 'provided to youtube by'].includes(title)) {
-      hasMusicMetadata = true;
-      score += 2;
-      console.log('Music metadata detected (+2 points)');
-    }
-  });
-
-  // 2. Başlık Kontrolü
-  const videoTitle = document.querySelector('h1.style-scope.ytd-watch-metadata')?.textContent?.toLowerCase() || '';
-  console.log('Video title:', videoTitle);
-
-  // Güçlü başlık göstergeleri (2 puan)
-  const strongTitleIndicators = [
-    'official music video',
-    'official audio',
-    'lyrics video',
-    'lyric video',
-    'music video',
-    'resmi müzik',
-    'official video',
-    'official clip',
-    'resmi klip',
-    'provided to youtube by',
-    'auto-generated by youtube'
-  ];
-
-  // Zayıf başlık göstergeleri (1 puan)
-  const weakTitleIndicators = [
-    'lyrics',
-    'ft.',
-    'feat.',
-    'remix',
-    'cover',
-    'official',
-    'resmi',
-    'klip',
-    'clip',
-    'mv',
-    'performance',
-    'live',
-    'acoustic',
-    'unplugged',
-    'instrumental',
-    'karaoke'
-  ];
-
-  // Başlıkta tire veya benzeri ayraçlar varsa (1 puan)
-  const titleSeparators = [' - ', ' – ', ' — ', ' • ', ' | '];
-  if (titleSeparators.some(separator => videoTitle.includes(separator))) {
-    score += 1;
-    console.log('Title contains separator (+1 point)');
-  }
-
-  // Güçlü göstergeler kontrolü
-  if (strongTitleIndicators.some(indicator => videoTitle.includes(indicator))) {
-    score += 2;
-    console.log('Strong title indicator found (+2 points)');
-  }
-
-  // Zayıf göstergeler kontrolü
-  if (weakTitleIndicators.some(indicator => videoTitle.includes(indicator))) {
-    score += 1;
-    console.log('Weak title indicator found (+1 point)');
-  }
-
-  // 3. Açıklama Kontrolü
-  const description = document.querySelector('#description-inline-expander')?.textContent?.toLowerCase() || '';
-
-  // Güçlü açıklama göstergeleri (2 puan)
-  const strongDescriptionIndicators = [
-    'official music video',
-    'official audio',
-    'provided to youtube by',
-    'auto-generated by youtube',
-    'licensed to youtube by',
-    '℗',
-    'all rights reserved',
-    'released on:',
-    'stream on spotify',
-    'listen on spotify',
-    'available on spotify'
-  ];
-
-  // Zayıf açıklama göstergeleri (1 puan)
-  const weakDescriptionIndicators = [
-    'track:',
-    'artist:',
-    'song:',
-    'album:',
-    'genre:',
-    'music video by',
-    'lyrics',
-    'follow on spotify',
-    'follow me on spotify',
-    'spotify:',
-    'apple music:',
-    'itunes:'
-  ];
-
-  // Güçlü açıklama göstergeleri kontrolü
-  if (strongDescriptionIndicators.some(indicator => description.includes(indicator))) {
-    score += 2;
-    console.log('Strong description indicator found (+2 points)');
-  }
-
-  // Zayıf açıklama göstergeleri kontrolü
-  if (weakDescriptionIndicators.some(indicator => description.includes(indicator))) {
-    score += 1;
-    console.log('Weak description indicator found (+1 point)');
-  }
-
-  // 4. Kanal Adı Kontrolü
-  const channelName = document.querySelector('#channel-name')?.textContent?.toLowerCase() || '';
-  const channelIndicators = ['music', 'records', 'recording', 'müzik', 'official', 'resmi', 'vevo', 'sound'];
-
-  if (channelIndicators.some(indicator => channelName.includes(indicator))) {
-    score += 1;
-    console.log('Channel name indicates music (+1 point)');
-  }
-
-  // 5. Video Süresi Kontrolü (tipik müzik uzunluğu 2-8 dakika)
-  const duration = document.querySelector('.ytp-time-duration')?.textContent || '';
-  if (duration) {
-    const [minutes, seconds] = duration.split(':').map(Number);
-    const totalSeconds = minutes * 60 + seconds;
-    if (totalSeconds >= 120 && totalSeconds <= 480) {
-      score += 1;
-      console.log('Video duration typical for music (+1 point)');
+// Listen for page navigation
+let currentUrl = window.location.href;
+setInterval(() => {
+  if (currentUrl !== window.location.href) {
+    currentUrl = window.location.href;
+    if (window.location.pathname === '/watch') {
+      setTimeout(initializeButton, 1000); // Wait for page content to load
     }
   }
+}, 1000);
 
-  console.log(`Final score: ${score} (threshold: ${THRESHOLD})`);
-  return score >= THRESHOLD;
+// Initial button creation
+if (window.location.pathname === '/watch') {
+  setTimeout(initializeButton, 1000);
 }

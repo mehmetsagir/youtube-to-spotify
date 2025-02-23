@@ -199,10 +199,12 @@ class SpotifyClient {
     const token = await this.getToken();
     const { artist, song } = query;
 
-    const searchQueries = this.generateSearchQueries(artist, song);
-    let allResults = [];
+    // Spotify API'sinin özel arama sözdizimini kullan
+    const searchQuery = artist
+      ? `track:"${song}" artist:"${artist}"`  // Hem şarkı hem sanatçı varsa
+      : `track:"${song}"`; // Sadece şarkı adı varsa
 
-    for (const searchQuery of searchQueries) {
+    try {
       const response = await fetch(
         `${SPOTIFY_API.BASE_URL}/search?q=${encodeURIComponent(searchQuery)}&type=track&limit=10`,
         { headers: { 'Authorization': `Bearer ${token}` } }
@@ -214,24 +216,28 @@ class SpotifyClient {
       }
 
       const data = await response.json();
-      if (data.tracks?.items.length > 0) {
-        allResults = allResults.concat(data.tracks.items);
+      const results = data.tracks?.items || [];
+
+      // Eğer tam eşleşme bulunamazsa, daha geniş bir arama yap
+      if (results.length === 0 && artist) {
+        // Sanatçı adı ile daha esnek bir arama yap
+        const fallbackQuery = `${artist} ${song}`;
+        const fallbackResponse = await fetch(
+          `${SPOTIFY_API.BASE_URL}/search?q=${encodeURIComponent(fallbackQuery)}&type=track&limit=10`,
+          { headers: { 'Authorization': `Bearer ${token}` } }
+        );
+
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          results.push(...(fallbackData.tracks?.items || []));
+        }
       }
+
+      return this.processSearchResults(results, artist, song);
+    } catch (error) {
+      console.error('Search error:', error);
+      throw error;
     }
-
-    return this.processSearchResults(allResults, artist, song);
-  }
-
-  generateSearchQueries(artist, song) {
-    const cleanArtist = this.cleanString(artist);
-    const cleanSong = this.cleanString(song);
-
-    return [
-      `${cleanArtist} ${cleanSong}`, // Full search
-      cleanSong, // Just song name
-      // Handle multiple artists
-      ...cleanArtist.split(/\s+/).map(artistPart => `${artistPart} ${cleanSong}`)
-    ];
   }
 
   processSearchResults(results, targetArtist, targetSong) {
@@ -506,4 +512,4 @@ async function handleSelectedSong(track, sendResponse) {
       error: error.message
     });
   }
-} 
+}
