@@ -576,8 +576,8 @@ class SpotifyButton {
       .settings-handle svg {
         width: 16px;
         height: 16px;
-        color: rgba(255, 255, 255, 0.8);
-        opacity: 0.8;
+        color: rgba(255, 255, 255, 0.9);
+        opacity: 0.9;
         transition: all 0.2s ease;
       }
 
@@ -667,12 +667,13 @@ class SpotifyButton {
       .drag-handle svg {
         width: 16px;
         height: 16px;
-        color: rgba(255, 255, 255, 0.8);
-        opacity: 0.8;
+        color: rgba(255, 255, 255, 0.9);
+        opacity: 0.9;
       }
 
       .drag-handle:hover svg {
         opacity: 1;
+        color: rgba(255, 255, 255, 1);
       }
     `;
     document.head.appendChild(style);
