@@ -13,6 +13,26 @@ const SPOTIFY_COLORS = {
 // Utility functions
 const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
 
+// Theme detection function
+function isYoutubeLightTheme() {
+  return !document.documentElement.hasAttribute('dark');
+}
+
+// Get theme-based colors
+function getThemeColors() {
+  const isLightTheme = isYoutubeLightTheme();
+  return {
+    iconColor: isLightTheme ? 'rgba(0, 0, 0, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+    iconHoverColor: isLightTheme ? 'rgba(0, 0, 0, 1)' : 'rgba(255, 255, 255, 1)',
+    controlBgColor: isLightTheme ? 'rgba(0, 0, 0, 0.08)' : 'rgba(128, 128, 128, 0.15)',
+    controlHoverBgColor: isLightTheme ? 'rgba(0, 0, 0, 0.15)' : 'rgba(128, 128, 128, 0.25)',
+    controlActiveBgColor: isLightTheme ? 'rgba(0, 0, 0, 0.25)' : 'rgba(128, 128, 128, 0.35)',
+    dropdownBg: isLightTheme ? '#ffffff' : '#282828',
+    textColor: isLightTheme ? '#000000' : '#ffffff',
+    dropdownHoverBg: isLightTheme ? 'rgba(0, 0, 0, 0.1)' : 'rgba(255, 255, 255, 0.1)'
+  };
+}
+
 // Get song information from YouTube page
 function getSongInfo() {
   const title = document.querySelector('h1.style-scope.ytd-watch-metadata')?.textContent;
@@ -394,6 +414,96 @@ class SpotifyButton {
     this.longPressTimer = null;
     this.longPressDuration = 500; // 500ms for long press
     this.handleResize = this.handleResize.bind(this);
+    this.themeObserver = null;
+  }
+
+  setupThemeObserver() {
+    // Create observer to watch for theme changes
+    this.themeObserver = new MutationObserver((mutations) => {
+      mutations.forEach((mutation) => {
+        if (mutation.attributeName === 'dark') {
+          this.updateThemeStyles();
+        }
+      });
+    });
+
+    // Start observing html element
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['dark']
+    });
+  }
+
+  updateThemeStyles() {
+    const colors = getThemeColors();
+    const style = document.createElement('style');
+    style.textContent = `
+      .settings-handle {
+        background: ${colors.controlBgColor};
+      }
+
+      .settings-handle:hover {
+        background: ${colors.controlHoverBgColor};
+      }
+
+      .settings-handle svg {
+        color: ${colors.iconColor};
+      }
+
+      .settings-handle:hover svg {
+        color: ${colors.iconHoverColor};
+      }
+
+      .settings-dropdown {
+        background: ${colors.dropdownBg};
+      }
+
+      .settings-item {
+        color: ${colors.textColor};
+      }
+
+      .settings-item:hover {
+        background: ${colors.dropdownHoverBg};
+      }
+
+      .settings-item svg {
+        color: ${colors.iconColor};
+      }
+
+      .settings-item:hover svg {
+        color: ${colors.iconHoverColor};
+      }
+
+      .drag-handle {
+        background: ${colors.controlBgColor};
+      }
+
+      .drag-handle:hover {
+        background: ${colors.controlHoverBgColor};
+      }
+
+      .drag-handle:active {
+        background: ${colors.controlActiveBgColor};
+      }
+
+      .drag-handle svg {
+        color: ${colors.iconColor};
+      }
+
+      .drag-handle:hover svg {
+        color: ${colors.iconHoverColor};
+      }
+    `;
+
+    // Remove old theme styles if they exist
+    const oldStyle = document.querySelector('#spotify-theme-styles');
+    if (oldStyle) {
+      oldStyle.remove();
+    }
+
+    // Add new theme styles
+    style.id = 'spotify-theme-styles';
+    document.head.appendChild(style);
   }
 
   async create() {
@@ -677,6 +787,12 @@ class SpotifyButton {
       }
     `;
     document.head.appendChild(style);
+
+    // Apply initial theme styles
+    this.updateThemeStyles();
+
+    // Setup theme observer
+    this.setupThemeObserver();
 
     // Load saved position
     const position = await this.loadPosition();
@@ -1076,7 +1192,7 @@ class SpotifyButton {
     const showText = storage.spotify_button_style !== 'icon_only';
     const spotifyIcon = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="margin-right: ${showText ? '8px' : '0'}">
-        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
+        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.371-.721.49-1.101.241-3.021-1.858-6.832-2.278-11.322-1.237-.422.1-.851-.16-.954-.583-.1-.422.16-.851.583-.954 4.91-1.121 9.084-.62 12.451 1.432.39.241.49.721.241 1.101zm1.472-3.272c-.301.47-.842.619-1.312.319-3.474-2.14-8.761-2.76-12.871-1.511-.533.159-1.082-.16-1.232-.682-.15-.533.16-1.082.682-1.232 4.721-1.432 10.561-.72 14.511 1.812.46.301.619.842.319 1.312zm.129-3.402c-4.151-2.468-11.022-2.698-15.002-1.492-.633.191-1.312-.16-1.503-.803-.191-.633.16-1.312.803-1.503 4.581-1.392 12.192-1.121 17.002 1.722.582.34.773 1.082.432 1.662-.341.571-1.082.762-1.662.421z"/>
       </svg>
     `;
 
@@ -1147,6 +1263,13 @@ class SpotifyButton {
     document.removeEventListener('webkitfullscreenchange', this.fullscreenHandler);
     document.removeEventListener('mozfullscreenchange', this.fullscreenHandler);
     document.removeEventListener('MSFullscreenChange', this.fullscreenHandler);
+    if (this.themeObserver) {
+      this.themeObserver.disconnect();
+    }
+    const themeStyles = document.querySelector('#spotify-theme-styles');
+    if (themeStyles) {
+      themeStyles.remove();
+    }
   }
 }
 
